@@ -503,7 +503,7 @@ public final class JanInfo extends Observable implements Cloneable {
     /**
      * 和了情報を設定
      * 
-     * @param wind 和了情報。
+     * @param completeInfo 和了情報。
      */
     public void setCompleteInfo(final ChmCompleteInfo completeInfo) {
         _completeInfo = completeInfo;
