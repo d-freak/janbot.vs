@@ -8,10 +8,8 @@
 package wiz.project.janbot.game;
 
 import java.util.List;
-import java.util.Map;
 
 import wiz.project.jan.JanPai;
-import wiz.project.jan.Wind;
 import wiz.project.janbot.game.exception.JanException;
 
 
@@ -22,74 +20,54 @@ import wiz.project.janbot.game.exception.JanException;
 interface JanController {
     
     /**
-     * 副露
-     * 
-     * @param playerName プレイヤー名。
-     * @param type 副露タイプ。
-     * @param target 牌指定。nullを許可する。
-     * @throws JanException 例外イベント。
-     */
-    public void call(final String playerName, final CallType type, final JanPai target) throws JanException;
-    
-    /**
-     * 和了 (ロン)
-     * 
-     * @param playerName プレイヤー名。
-     * @throws JanException 例外イベント。
-     */
-    public void completeRon(final String playerName) throws JanException;
-    
-    /**
      * 和了 (ツモ)
      * 
+     * @param info ゲーム情報。
      * @throws JanException 例外イベント。
      */
-    public void completeTsumo() throws JanException;
+    public void completeTsumo(final JanInfo info) throws JanException;
     
     /**
      * 打牌 (ツモ切り)
      * 
+     * @param info ゲーム情報。
      * @throws JanException 例外イベント。
      */
-    public void discard() throws JanException;
+    public void discard(final JanInfo info) throws JanException;
     
     /**
      * 打牌 (手出し)
      * 
+     * @param info ゲーム情報。
      * @param target 捨て牌。
      * @throws JanException 例外イベント。
      */
-    public void discard(final JanPai target) throws JanException;
-    
-    /**
-     * ゲーム情報を取得
-     * 
-     * @return ゲーム情報。
-     */
-    public JanInfo getGameInfo();
+    public void discard(final JanInfo info, final JanPai target) throws JanException;
     
     /**
      * 次のプレイヤーの打牌へ
      * 
+     * @param info ゲーム情報。
      * @throws JanException 例外イベント。
      */
-    public void next() throws JanException;
+    public void next(final JanInfo info) throws JanException;
     
     /**
-     * リーチ
+     * ゲーム開始
      * 
+     * @param playerNameList プレイヤー名のリスト。
+     * @return ゲーム情報。
      * @throws JanException 例外イベント。
      */
-    public void richi(final JanPai target) throws JanException;
+    public JanInfo startGame(final List<String> playerNameList) throws JanException;
     
     /**
-     * 開始
+     * 局を開始
      * 
-     * @param deck 牌山。
-     * @param playerTable プレイヤーテーブル。
+     * @param info ゲーム情報。
      * @throws JanException 例外イベント。
      */
-    public void start(final List<JanPai> deck, final Map<Wind, Player> playerTable) throws JanException;
+    public void startRound(final JanInfo info) throws JanException;
     
 }
 

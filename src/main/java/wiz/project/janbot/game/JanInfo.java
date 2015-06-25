@@ -9,6 +9,7 @@ package wiz.project.janbot.game;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -45,7 +46,7 @@ public final class JanInfo extends Observable implements Cloneable {
      */
     public JanInfo(final JanInfo source) {
         if (source != null) {
-            _playerTable = deepCopyMap(source._playerTable);
+            setPlayerTable(source._playerTable);
             _deck = deepCopyList(source._deck);
             _deckIndex = source._deckIndex;
             _deckWallIndex = source._deckWallIndex;
@@ -593,11 +594,9 @@ public final class JanInfo extends Observable implements Cloneable {
      * @param playerTable プレイヤーテーブル。
      */
     public void setPlayerTable(final Map<Wind, Player> playerTable) {
+        _playerTable.clear();
         if (playerTable != null) {
-            _playerTable = deepCopyMap(playerTable);
-        }
-        else {
-            _playerTable.clear();
+            _playerTable.putAll(deepCopyMap(playerTable));
         }
     }
     
@@ -732,7 +731,7 @@ public final class JanInfo extends Observable implements Cloneable {
     /**
      * プレイヤーテーブル
      */
-    private Map<Wind, Player> _playerTable = new TreeMap<>();
+    private final Map<Wind, Player> _playerTable = Collections.synchronizedMap(new TreeMap<Wind, Player>());
     
     /**
      * 牌山

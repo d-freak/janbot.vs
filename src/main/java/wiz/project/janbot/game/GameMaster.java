@@ -11,6 +11,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Observable;
+import java.util.Observer;
 
 import wiz.project.ircbot.IRCBOT;
 import wiz.project.jan.JanPai;
@@ -23,7 +25,7 @@ import wiz.project.janbot.game.exception.JanException;
 /**
  * ゲーム管理
  */
-public final class GameMaster {
+public final class GameMaster implements Observer {
     
     /**
      * コンストラクタを自分自身に限定許可
@@ -50,6 +52,9 @@ public final class GameMaster {
     public void clear() {
         _playerNameList.clear();
         
+        synchronized (_JAN_INFO_LOCK) {
+            _janInfo = new JanInfo();
+        }
         synchronized (_STATUS_LOCK) {
             _status = GameStatus.CLOSE;
         }
@@ -89,18 +94,15 @@ public final class GameMaster {
             }
         }
         
-        // TODO ツモ切り
-        // コントローラでやる予定
-        
-        
-        
-        // 以降はダミー処理
-        final String activePlayer = _playerNameList.get(_activePlayerIndex++);
-        if (_activePlayerIndex >= _playerNameList.size()) {
-            _activePlayerIndex = 0;
+        synchronized (_JAN_INFO_LOCK) {
+            if (!playerName.equals(_janInfo.getActivePlayer().getName())) {
+                // アクティブではない状態でのコマンド実行を無視
+                return;
+            }
+            
+            final JanController controller = createJanController();
+            controller.discard(_janInfo);
         }
-        final List<String> list = Arrays.asList(activePlayer + " のターン！", "(色々未実装なので、このトーク画面で", " 「jan d」とだけ発言してください)");
-        IRCBOT.getInstance().talk(activePlayer, list);
     }
     
     /**
@@ -131,6 +133,9 @@ public final class GameMaster {
         if (playerNameList.isEmpty()) {
             throw new NullPointerException("Player name list is empty.");
         }
+        if (playerNameList.size() == 1) {
+            throw new IllegalArgumentException("ぼっち");
+        }
         
         synchronized (_STATUS_LOCK) {
             if (_status.isClose()) {
@@ -149,27 +154,16 @@ public final class GameMaster {
         }
         _playerNameList.addAll(playerNameList);
         
-        // TODO 席決め
-        // TODO 山積み
-        // TODO 配牌
-        // 全部コントローラでやる予定
-        
         synchronized (_STATUS_LOCK) {
             _status = GameStatus.IDLE;
         }
         
-        // TODO 第一ツモ
-        // コントローラでやる予定
-        
-        
-        
-        // 以降はダミー処理
-        final String activePlayer = _playerNameList.get(_activePlayerIndex++);
-        if (_activePlayerIndex >= _playerNameList.size()) {
-            _activePlayerIndex = 0;
+        synchronized (_JAN_INFO_LOCK) {
+            final JanController controller = createJanController();
+            _janInfo = controller.startGame(playerNameList);
+            
+            controller.startRound(_janInfo);
         }
-        final List<String> list = Arrays.asList(activePlayer + " のターン！", "(色々未実装なので、このトーク画面で", " 「jan d」とだけ発言してください)");
-        IRCBOT.getInstance().talk(activePlayer, list);
     }
     
     /**
@@ -219,6 +213,24 @@ public final class GameMaster {
         IRCBOT.getInstance().println("----- IRCで現在使用しているニックネームで登録すること");
         IRCBOT.getInstance().println("----- 区切り文字には半角スペースを使用すること");
         IRCBOT.getInstance().println("ex.) jan entry Mr.A Mr.B Mr.C");
+    }
+    
+    /**
+     * 状態更新時の処理
+     * 
+     * @param target 監視対象オブジェクト。
+     * @param param 更新通知パラメータ。
+     */
+    public void update(final Observable target, final Object param) {
+        if (!(target instanceof JanInfo)) {
+            return;
+        }
+        
+        // TODO ダミー実装
+        IRCBOT.getInstance().println("--- 流局した気がする ---");
+        
+        // 直接次局に行くと _janInfo に対するデッドロックになる気がするので注意
+        // ユーザ操作(jan next とか)を待って次局に行くようにすれば回避できるので最初はそれ
     }
     
     
@@ -322,6 +334,15 @@ public final class GameMaster {
         }
     }
     
+    /**
+     * 麻雀コントローラを生成
+     * 
+     * @return 麻雀コントローラ。
+     */
+    private JanController createJanController() {
+        return new VSChmJanController();
+    }
+    
     
     
     /**
@@ -336,6 +357,11 @@ public final class GameMaster {
      */
     private final Object _STATUS_LOCK = new Object();
     
+    /**
+     * ロックオブジェクト (麻雀ゲーム情報)
+     */
+    private final Object _JAN_INFO_LOCK = new Object();
+    
     
     
     /**
@@ -348,12 +374,10 @@ public final class GameMaster {
      */
     private final List<String> _playerNameList = Collections.synchronizedList(new ArrayList<String>());
     
-    
-    
     /**
-     * ダミー処理用のインデックス (後で消す)
+     * 麻雀ゲーム情報
      */
-    private int _activePlayerIndex = 0;
+    private JanInfo _janInfo = new JanInfo();
     
 }
 
