@@ -80,7 +80,10 @@ class VSChmJanController implements JanController {
     /**
      * 開始
      */
-    public JanInfo startGame(final List<String> playerNameList) throws JanException {
+    public void startGame(final JanInfo info, final List<String> playerNameList) throws JanException {
+        if (info == null) {
+            throw new NullPointerException("Jan info is null.");
+        }
         if (playerNameList == null) {
             throw new NullPointerException("Player name list is null.");
         }
@@ -89,8 +92,6 @@ class VSChmJanController implements JanController {
         }
         
         // 現状席決めのみ
-        
-        final JanInfo info = new JanInfo();
         
         // 風をシャッフル
         final List<Wind> windList = new ArrayList<>(Arrays.asList(Wind.values()));
@@ -110,7 +111,6 @@ class VSChmJanController implements JanController {
         
         info.setFieldWind(Wind.TON);
         info.setPlayerTable(playerTable);
-        return info;
     }
     
     /**
@@ -166,7 +166,7 @@ class VSChmJanController implements JanController {
         info.setActiveDiscard(target);
         
         // TODO 直接IRCBOTを叩かずにアナウンサーにやらせたい
-        IRCBOT.getInstance().println(info.getActiveRiver().toString());
+        IRCBOT.getInstance().println(info.getActivePlayer().getName() + "捨牌： " + info.getActiveRiver().toString());
         
         // TODO 鳴き確認処理
     }

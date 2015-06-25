@@ -159,8 +159,11 @@ public final class GameMaster implements Observer {
         }
         
         synchronized (_JAN_INFO_LOCK) {
+            // TODO アナウンサーをちゃんと実装したらここを解放
+//          _janInfo.addObserver(new GameAnnouncer());
+            
             final JanController controller = createJanController();
-            _janInfo = controller.startGame(playerNameList);
+            controller.startGame(_janInfo, playerNameList);
             
             controller.startRound(_janInfo);
         }

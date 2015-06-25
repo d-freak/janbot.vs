@@ -46,13 +46,15 @@ public class GameAnnouncer implements Observer {
      */
     @SuppressWarnings("unchecked")
     public void update(final Observable target, final Object param) {
-        if (target instanceof JanInfo) {
-            if (param instanceof EnumSet) {
-                updateOnSolo((JanInfo)target, (EnumSet<AnnounceFlag>)param);
-            }
-            else if (param instanceof AnnounceFlag) {
-                updateOnSolo((JanInfo)target, EnumSet.of((AnnounceFlag)param));
-            }
+        if (!(target instanceof JanInfo)) {
+            return;
+        }
+        
+        if (param instanceof EnumSet) {
+            updateCore((JanInfo)target, (EnumSet<AnnounceFlag>)param);
+        }
+        else if (param instanceof AnnounceFlag) {
+            updateCore((JanInfo)target, EnumSet.of((AnnounceFlag)param));
         }
     }
     
@@ -103,7 +105,7 @@ public class GameAnnouncer implements Observer {
      * @param info 麻雀ゲーム情報。
      * @param flagSet 実況フラグ。
      */
-    protected void updateOnSolo(final JanInfo info, final EnumSet<AnnounceFlag> flagSet) {
+    protected void updateCore(final JanInfo info, final EnumSet<AnnounceFlag> flagSet) {
         if (info == null) {
             throw new NullPointerException("Game information is null.");
         }
@@ -493,7 +495,7 @@ public class GameAnnouncer implements Observer {
     /**
      * 中国麻雀フラグ
      */
-    private boolean _isChm = false;
+    private boolean _isChm = true;  // 中国麻雀特化
     
 }
 

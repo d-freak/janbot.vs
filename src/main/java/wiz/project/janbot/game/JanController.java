@@ -55,11 +55,11 @@ interface JanController {
     /**
      * ゲーム開始
      * 
+     * @param info ゲーム情報。
      * @param playerNameList プレイヤー名のリスト。
-     * @return ゲーム情報。
      * @throws JanException 例外イベント。
      */
-    public JanInfo startGame(final List<String> playerNameList) throws JanException;
+    public void startGame(final JanInfo info, final List<String> playerNameList) throws JanException;
     
     /**
      * 局を開始
