@@ -44,7 +44,7 @@ final class AnnounceParam {
     
     
     /**
-     * 実況フラグ持っているか
+     * 実況フラグを持っているか
      */
     public boolean hasFlag(final AnnounceFlag source) {
         return _flagSet.contains(source);

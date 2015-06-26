@@ -100,9 +100,9 @@ class VSChmJanController implements JanController {
         // JanInfoの内部情報を更新
         final Wind activeWind = info.getActiveWind();
         info.setHand(activeWind, hand);
+        updateWaitList(info, activeWind);
         
-        // TODO 手変わりがあったので、ここで待ち牌リストも更新する必要あり
-        
+        // 牌を捨てる
         discardCore(info, target);
         next(info);
     }
@@ -136,7 +136,7 @@ class VSChmJanController implements JanController {
             throw new NullPointerException("Player name list is null.");
         }
         if (playerNameList.isEmpty()) {
-            throw new NullPointerException("Player name list is empty.");
+            throw new IllegalArgumentException("Player name list is empty.");
         }
         
         // 現状席決めのみ
@@ -182,7 +182,12 @@ class VSChmJanController implements JanController {
         info.setDeckWallIndex(34 * 4 - 1 - 1);
         info.setRemainCount(84);  // 中国麻雀は王牌がないため、残り枚数は84枚 ※花牌を除く
         
-        // TODO 待ち牌リストの構築
+        // 待ち牌リストを更新
+        for (final Map.Entry<Wind, Player> entry : info.getPlayerTable().entrySet()) {
+            if (entry.getValue().getType() == PlayerType.HUMAN) {
+                updateWaitList(info, entry.getKey());
+            }
+        }
         
         // 一巡目へ (親の14枚目はこの先でツモらせる)
         info.setActiveWind(Wind.TON);
@@ -215,7 +220,67 @@ class VSChmJanController implements JanController {
         
         info.notifyObservers(new AnnounceParam(info.getActivePlayer(), ANNOUNCE_FLAG_DISCARD));
         
-        // TODO 鳴き確認処理
+        // 鳴き確認処理
+        for (final Wind wind : Wind.values()) {
+            final List<AnnounceFlag> callableList = new ArrayList<>();
+            final Map<CallType, List<JanPai>> table = info.getWaitTable(wind);
+            for (final Map.Entry<CallType, List<JanPai>> entry : table.entrySet()) {
+                if (entry.getValue().contains(target)) {
+                    switch (entry.getKey()) {
+                    case CHI:
+                        callableList.add(AnnounceFlag.CALLABLE_CHI);
+                        break;
+                    case PON:
+                        callableList.add(AnnounceFlag.CALLABLE_PON);
+                        break;
+                    case KAN_LIGHT:
+                        callableList.add(AnnounceFlag.CALLABLE_KAN);
+                        break;
+                    case RON:
+                        callableList.add(AnnounceFlag.CALLABLE_RON);
+                        break;
+                    default:
+                        break;
+                    }
+                }
+            }
+            // TODO このcallableListはJanInfoにテーブル形式で持たせて上まで回そうと思う
+            
+            // マルチスレッド化しなくてもいいはず
+            info.notifyObservers(new AnnounceParam(info.getPlayer(wind), EnumSet.copyOf(callableList)));
+        }
+    }
+    
+    /**
+     * チーの待ち牌リストを取得
+     * 
+     * @param hand クリーン済みの手牌マップ。
+     * @return チーの待ち牌リスト。
+     */
+    private List<JanPai> getChiWaitList(final Map<JanPai, Integer> hand) {
+        
+        // TODO JanLIBに移す
+        
+        final List<JanPai> resultList = new ArrayList<>();
+        for (final JanPai pai : JanPai.values()) {
+            if (isCallableChi(hand, pai)) {
+                resultList.add(pai);
+            }
+        }
+        return resultList;
+    }
+    
+    /**
+     * プレイヤーの手牌マップを取得
+     * 
+     * @param info ゲーム情報。
+     * @param wind プレイヤーの風。
+     * @return プレイヤーの手牌マップ。
+     */
+    private Map<JanPai, Integer> getHandMap(final JanInfo info, final Wind wind) {
+        final Map<JanPai, Integer> hand = info.getHand(wind).getMenZenMap();
+        JanPaiUtil.cleanJanPaiMap(hand);
+        return hand;
     }
     
     /**
@@ -247,6 +312,82 @@ class VSChmJanController implements JanController {
     }
     
     /**
+     * 明槓の待ち牌リストを取得
+     * 
+     * @param hand クリーン済みの手牌マップ。
+     * @return 明槓の待ち牌リスト。
+     */
+    private List<JanPai> getKanLightWaitList(final Map<JanPai, Integer> hand) {
+        final List<JanPai> resultList = new ArrayList<>();
+        for (final Map.Entry<JanPai, Integer> entry : hand.entrySet()) {
+            if (entry.getValue() >= 3) {
+                resultList.add(entry.getKey());
+            }
+        }
+        return resultList;
+    }
+    
+    /**
+     * ポンの待ち牌リストを取得
+     * 
+     * @param hand クリーン済みの手牌マップ。
+     * @return ポンの待ち牌リスト。
+     */
+    private List<JanPai> getPonWaitList(final Map<JanPai, Integer> hand) {
+        
+        // TODO JanLIBに移す
+        
+        final List<JanPai> resultList = new ArrayList<>();
+        for (final Map.Entry<JanPai, Integer> entry : hand.entrySet()) {
+            if (entry.getValue() >= 2) {
+                resultList.add(entry.getKey());
+            }
+        }
+        return resultList;
+    }
+    
+    /**
+     * チー可能か
+     * 
+     * @param hand クリーン済みの手牌マップ。
+     * @param discard 捨て牌。
+     * @return 判定結果。
+     */
+    private boolean isCallableChi(final Map<JanPai, Integer> hand, final JanPai discard) {
+        
+        // TODO JanLIBに移す
+        
+        if (discard.isJi()) {
+            return false;
+        }
+        
+        switch (discard) {
+        case MAN_1:
+        case PIN_1:
+        case SOU_1:
+            return hand.containsKey(discard.getNext()) && hand.containsKey(discard.getNext().getNext());
+        case MAN_2:
+        case PIN_2:
+        case SOU_2:
+            return (hand.containsKey(discard.getNext()) && hand.containsKey(discard.getNext().getNext())) ||
+                   (hand.containsKey(discard.getPrev()) && hand.containsKey(discard.getNext()));
+        case MAN_8:
+        case PIN_8:
+        case SOU_8:
+            return (hand.containsKey(discard.getPrev()) && hand.containsKey(discard.getNext())) ||
+                   (hand.containsKey(discard.getPrev()) && hand.containsKey(discard.getPrev().getPrev()));
+        case MAN_9:
+        case PIN_9:
+        case SOU_9:
+            return hand.containsKey(discard.getPrev()) && hand.containsKey(discard.getPrev().getPrev());
+        default:
+            return (hand.containsKey(discard.getNext()) && hand.containsKey(discard.getNext().getNext())) ||
+                   (hand.containsKey(discard.getPrev()) && hand.containsKey(discard.getNext())) ||
+                   (hand.containsKey(discard.getPrev()) && hand.containsKey(discard.getPrev().getPrev()));
+        }
+    }
+    
+    /**
      * 巡目ごとの処理
      * 
      * @param info ゲーム情報。
@@ -269,6 +410,22 @@ class VSChmJanController implements JanController {
             info.notifyObservers(new AnnounceParam(activePlayer, ANNOUNCE_FLAG_HAND_TSUMO));
             break;
         }
+    }
+    
+    /**
+     * 待ち判定を更新
+     * 
+     * @param info ゲーム情報。
+     * @param wind 風。
+     */
+    private void updateWaitList(final JanInfo info, final Wind wind) {
+        final Map<JanPai, Integer> hand = getHandMap(info, wind);
+        final Map<CallType, List<JanPai>> waitTable = info.getWaitTable(wind);
+        waitTable.put(CallType.RON, HandCheckUtil.getCompletableJanPaiList(hand));
+        waitTable.put(CallType.CHI, getChiWaitList(hand));
+        waitTable.put(CallType.PON, getPonWaitList(hand));
+        waitTable.put(CallType.KAN_LIGHT, getKanLightWaitList(hand));
+        info.setWaitTable(wind, waitTable);
     }
     
     

@@ -10,9 +10,9 @@ package wiz.project.janbot.game;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Observable;
 import java.util.TreeMap;
 
@@ -32,11 +32,7 @@ public final class JanInfo extends Observable implements Cloneable {
      * コンストラクタ
      */
     public JanInfo() {
-        for (final Wind wind : Wind.values()) {
-            _playerTable.put(wind, new Player());
-            _handTable.put(wind, new Hand());
-            _riverTable.put(wind, new River());
-        }
+        clear();
     }
     
     /**
@@ -46,6 +42,7 @@ public final class JanInfo extends Observable implements Cloneable {
      */
     public JanInfo(final JanInfo source) {
         if (source != null) {
+            _status = source._status;
             setPlayerTable(source._playerTable);
             _deck = deepCopyList(source._deck);
             _deckIndex = source._deckIndex;
@@ -64,8 +61,11 @@ public final class JanInfo extends Observable implements Cloneable {
             for (final Map.Entry<Wind, Hand> entry : source._handTable.entrySet()) {
                 _handTable.put(entry.getKey(), entry.getValue().clone());
             }
-            for (final Entry<Wind, River> entry : source._riverTable.entrySet()) {
+            for (final Map.Entry<Wind, River> entry : source._riverTable.entrySet()) {
                 _riverTable.put(entry.getKey(), entry.getValue().clone());
+            }
+            for (final Map.Entry<Wind, Map<CallType, List<JanPai>>> entry : source._waitTable.entrySet()) {
+                _waitTable.put(entry.getKey(), deepCopyWaitTable(entry.getValue()));
             }
         }
     }
@@ -90,6 +90,7 @@ public final class JanInfo extends Observable implements Cloneable {
      * フィールドを全消去
      */
     public void clear() {
+        _status = GameStatus.CLOSE;
         _deck.clear();
         _deckIndex = 0;
         _deckWallIndex = 0;
@@ -106,6 +107,11 @@ public final class JanInfo extends Observable implements Cloneable {
             _playerTable.put(wind, new Player());
             _handTable.put(wind, new Hand());
             _riverTable.put(wind, new River());
+            final Map<CallType, List<JanPai>> waitTable = Collections.synchronizedMap(new TreeMap<CallType, List<JanPai>>());
+            for (final CallType type : CallType.values()) {
+                waitTable.put(type, Collections.synchronizedList(new ArrayList<JanPai>()));
+            }
+            _waitTable.put(wind, waitTable);
         }
     }
     
@@ -235,6 +241,15 @@ public final class JanInfo extends Observable implements Cloneable {
      */
     public Wind getFieldWind() {
         return _fieldWind;
+    }
+    
+    /**
+     * ゲームの状態を取得
+     * 
+     * @return ゲームの状態。
+     */
+    public GameStatus getStatus() {
+        return _status;
     }
     
     /**
@@ -382,6 +397,21 @@ public final class JanInfo extends Observable implements Cloneable {
         }
         else {
             return new River();
+        }
+    }
+    
+    /**
+     * 待ち牌テーブルを取得
+     * 
+     * @param wind 風。
+     * @return 待ち牌テーブル。
+     */
+    public Map<CallType, List<JanPai>> getWaitTable(final Wind wind) {
+        if (wind != null) {
+            return deepCopyWaitTable(_waitTable.get(wind));
+        }
+        else {
+            return deepCopyWaitTable(new HashMap<CallType, List<JanPai>>());
         }
     }
     
@@ -709,6 +739,38 @@ public final class JanInfo extends Observable implements Cloneable {
     }
     
     /**
+     * ゲームの状態を設定
+     * 
+     * @param status ゲームの状態。
+     */
+    public void setStatus(final GameStatus status) {
+        if (status != null) {
+            _status = status;
+        }
+        else {
+            _status = GameStatus.CLOSE;
+        }
+        notifyObservers();
+    }
+    
+    /**
+     * 待ち牌テーブルを設定
+     * 
+     * @param wind 風。
+     * @param table 待ち牌テーブル。
+     */
+    public void setWaitTable(final Wind wind, final Map<CallType, List<JanPai>> table) {
+        if (wind != null) {
+            if (table != null) {
+                _waitTable.put(wind, deepCopyWaitTable(table));
+            }
+            else {
+                _waitTable.put(wind, deepCopyWaitTable(new HashMap<CallType, List<JanPai>>()));
+            }
+        }
+    }
+    
+    /**
      * 王牌を設定
      * 
      * @param wanPai 王牌。
@@ -731,7 +793,7 @@ public final class JanInfo extends Observable implements Cloneable {
      * @return 複製結果。
      */
     private <E> List<E> deepCopyList(final List<E> sourceList) {
-        return new ArrayList<>(sourceList);
+        return Collections.synchronizedList(new ArrayList<E>(sourceList));
     }
     
     /**
@@ -741,7 +803,26 @@ public final class JanInfo extends Observable implements Cloneable {
      * @return 複製結果。
      */
     private <S, T> Map<S, T> deepCopyMap(final Map<S, T> source) {
-        return new TreeMap<>(source);
+        return Collections.synchronizedMap(new TreeMap<S, T>(source));
+    }
+    
+    /**
+     * 待ち牌テーブルをディープコピー
+     * 
+     * @param source 複製元。
+     * @return 複製結果。
+     */
+    private Map<CallType, List<JanPai>> deepCopyWaitTable(final Map<CallType, List<JanPai>> source) {
+        final Map<CallType, List<JanPai>> result = Collections.synchronizedMap(new TreeMap<CallType, List<JanPai>>());
+        for (final CallType type : CallType.values()) {
+            if (source.containsKey(type)) {
+                result.put(type, deepCopyList(source.get(type)));
+            }
+            else {
+                result.put(type, Collections.synchronizedList(new ArrayList<JanPai>()));
+            }
+        }
+        return result;
     }
     
     /**
@@ -782,9 +863,19 @@ public final class JanInfo extends Observable implements Cloneable {
     
     
     /**
+     * ゲームの状態
+     */
+    private GameStatus _status = GameStatus.CLOSE;
+    
+    /**
      * プレイヤーテーブル
      */
     private final Map<Wind, Player> _playerTable = Collections.synchronizedMap(new TreeMap<Wind, Player>());
+    
+    /**
+     * 待ち牌テーブル
+     */
+    private final Map<Wind, Map<CallType, List<JanPai>>> _waitTable = Collections.synchronizedMap(new TreeMap<Wind, Map<CallType, List<JanPai>>>());
     
     /**
      * 牌山

@@ -56,6 +56,8 @@ public class TalkAnnouncer extends AbstractAnnouncer {
             messageList.add(convertHandToString(info, param));
         }
         
+        // TODO 鳴き確認メッセージを出す
+        
         if (param.hasFlag(AnnounceFlag.COMPLETE_RON)) {
             messageList.add("---- ロン和了 ----");
         }

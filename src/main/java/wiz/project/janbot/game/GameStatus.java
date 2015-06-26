@@ -25,9 +25,19 @@ public enum GameStatus {
     BUSY,
     
     /**
-     * ユーザ入力待機
+     * ユーザ入力待機 (打牌待ち)
      */
-    IDLE,
+    IDLE_DISCARD,
+    
+    /**
+     * ユーザ入力待機 (鳴き確認)
+     */
+    IDLE_CALL,
+    
+    /**
+     * 局が終了
+     */
+    END_ROUND,
     
     /**
      * 未開始
@@ -51,7 +61,31 @@ public enum GameStatus {
      * @return 判定結果。
      */
     public boolean isIdle() {
-        return this == IDLE;
+        switch (this) {
+        case IDLE_DISCARD:
+        case IDLE_CALL:
+            return true;
+        default:
+            return false;
+        }
+    }
+    
+    /**
+     * 鳴き入力可能か
+     * 
+     * @return 判定結果。
+     */
+    public boolean isIdleCall() {
+        return this == IDLE_CALL;
+    }
+    
+    /**
+     * 打牌入力可能か
+     * 
+     * @return 判定結果。
+     */
+    public boolean isIdleDiscard() {
+        return this == IDLE_DISCARD;
     }
     
     /**

@@ -35,6 +35,11 @@ public enum AnnounceFlag {
     GAME_OVER,
     
     /**
+     * 鳴き確認
+     */
+    CONFIRM_CALL,
+    
+    /**
      * ロン可能
      */
     CALLABLE_RON,
@@ -142,6 +147,22 @@ public enum AnnounceFlag {
         case CALLABLE_CHI:
         case CALLABLE_PON:
         case CALLABLE_KAN:
+            return true;
+        default:
+            return false;
+        }
+    }
+    
+    /**
+     * 局が終了したか
+     * 
+     * @return 判定結果。
+     */
+    public boolean isRoundEnd() {
+        switch (this) {
+        case COMPLETE_RON:
+        case COMPLETE_TSUMO:
+        case GAME_OVER:
             return true;
         default:
             return false;

@@ -10,7 +10,9 @@ package wiz.project.janbot.game;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Observable;
 import java.util.Observer;
 
@@ -51,6 +53,7 @@ public final class GameMaster implements Observer {
      */
     public void clear() {
         _playerNameList.clear();
+        _callBuf.clear();
         
         synchronized (_JAN_INFO_LOCK) {
             _janInfo = new JanInfo();
@@ -82,24 +85,100 @@ public final class GameMaster implements Observer {
             throw new NullPointerException("Player name is null.");
         }
         if (playerName.isEmpty()) {
-            throw new NullPointerException("Player name is empty.");
+            throw new IllegalArgumentException("Player name is empty.");
         }
         
         synchronized (_STATUS_LOCK) {
-            if (!_status.isIdle()) {
-                throw new InvalidStateException("--- Not started ---");
+            if (!_status.isIdleDiscard()) {
+                // 入力待機状態ではない場合、コマンド実行を無視
+                return;
             }
         }
         
         synchronized (_JAN_INFO_LOCK) {
             if (!playerName.equals(_janInfo.getActivePlayer().getName())) {
-                // アクティブではない状態でのコマンド実行を無視
+                // アクティブ状態ではない場合、コマンド実行を無視
                 return;
             }
             
             final JanController controller = createJanController();
             controller.completeTsumo(_janInfo);
         }
+    }
+    
+    /**
+     * 鳴き処理 (パス)
+     * 
+     * @param playerName プレイヤー名。
+     * @throws JanException ゲーム処理例外。
+     */
+    public void onCall(final String playerName) throws JanException {
+        if (playerName == null) {
+            throw new NullPointerException("Player name is null.");
+        }
+        if (playerName.isEmpty()) {
+            throw new IllegalArgumentException("Player name is empty.");
+        }
+        if (!_playerNameList.contains(playerName)) {
+            throw new IllegalArgumentException("Player is not entry : " + playerName);
+        }
+        
+        onCall(new CallInfo(playerName));
+    }
+    
+    /**
+     * 鳴き処理 (牌指定無し)
+     * 
+     * @param playerName プレイヤー名。
+     * @param type 鳴きの種類。
+     * @throws JanException ゲーム処理例外。
+     */
+    public void onCall(final String playerName, final CallType type) throws JanException {
+        if (playerName == null) {
+            throw new NullPointerException("Player name is null.");
+        }
+        if (playerName.isEmpty()) {
+            throw new IllegalArgumentException("Player name is empty.");
+        }
+        if (!_playerNameList.contains(playerName)) {
+            throw new IllegalArgumentException("Player is not entry : " + playerName);
+        }
+        if (type == null) {
+            throw new NullPointerException("Call type is null.");
+        }
+        
+        onCall(new CallInfo(playerName, type));
+    }
+    
+    /**
+     * 鳴き処理 (牌指定あり)
+     * 
+     * @param playerName プレイヤー名。
+     * @param type 鳴きの種類。
+     * @param target 対象牌。
+     * @throws JanException ゲーム処理例外。
+     */
+    public void onCall(final String playerName, final CallType type, final String target) throws JanException {
+        if (playerName == null) {
+            throw new NullPointerException("Player name is null.");
+        }
+        if (playerName.isEmpty()) {
+            throw new IllegalArgumentException("Player name is empty.");
+        }
+        if (!_playerNameList.contains(playerName)) {
+            throw new IllegalArgumentException("Player is not entry : " + playerName);
+        }
+        if (type == null) {
+            throw new NullPointerException("Call type is null.");
+        }
+        if (target == null) {
+            throw new NullPointerException("Target janpai is null.");
+        }
+        if (target.isEmpty()) {
+            throw new IllegalArgumentException("Target janpai is empty.");
+        }
+        
+        onCall(new CallInfo(playerName, type, convertStringToJanPai(target)));
     }
     
     /**
@@ -113,21 +192,22 @@ public final class GameMaster implements Observer {
             throw new NullPointerException("Player name is null.");
         }
         if (playerName.isEmpty()) {
-            throw new NullPointerException("Player name is empty.");
+            throw new IllegalArgumentException("Player name is empty.");
         }
         if (!_playerNameList.contains(playerName)) {
             throw new IllegalArgumentException("Player is not entry : " + playerName);
         }
         
         synchronized (_STATUS_LOCK) {
-            if (!_status.isIdle()) {
-                throw new InvalidStateException("--- Not started ---");
+            if (!_status.isIdleDiscard()) {
+                // 入力待機状態ではない場合、コマンド実行を無視
+                return;
             }
         }
         
         synchronized (_JAN_INFO_LOCK) {
             if (!playerName.equals(_janInfo.getActivePlayer().getName())) {
-                // アクティブではない状態でのコマンド実行を無視
+                // アクティブ状態ではない場合、コマンド実行を無視
                 return;
             }
             
@@ -148,27 +228,28 @@ public final class GameMaster implements Observer {
             throw new NullPointerException("Player name is null.");
         }
         if (playerName.isEmpty()) {
-            throw new NullPointerException("Player name is empty.");
+            throw new IllegalArgumentException("Player name is empty.");
         }
         if (target == null) {
             throw new NullPointerException("Discard target is null.");
         }
         if (target.isEmpty()) {
-            throw new InvalidInputException("Discard target is empty.");
+            throw new IllegalArgumentException("Discard target is empty.");
         }
         if (!_playerNameList.contains(playerName)) {
             throw new IllegalArgumentException("Player is not entry : " + playerName);
         }
         
         synchronized (_STATUS_LOCK) {
-            if (!_status.isIdle()) {
-                throw new InvalidStateException("--- Not started ---");
+            if (!_status.isIdleDiscard()) {
+                // 入力待機状態ではない場合、コマンド実行を無視
+                return;
             }
         }
         
         synchronized (_JAN_INFO_LOCK) {
             if (!playerName.equals(_janInfo.getActivePlayer().getName())) {
-                // アクティブではない状態でのコマンド実行を無視
+                // アクティブ状態ではない場合、コマンド実行を無視
                 return;
             }
             
@@ -204,7 +285,7 @@ public final class GameMaster implements Observer {
             throw new NullPointerException("Player name list is null.");
         }
         if (playerNameList.isEmpty()) {
-            throw new NullPointerException("Player name list is empty.");
+            throw new IllegalArgumentException("Player name list is empty.");
         }
         if (playerNameList.size() == 1) {
             throw new IllegalArgumentException("ぼっち");
@@ -228,7 +309,7 @@ public final class GameMaster implements Observer {
         _playerNameList.addAll(playerNameList);
         
         synchronized (_STATUS_LOCK) {
-            _status = GameStatus.IDLE;
+            _status = GameStatus.IDLE_DISCARD;
         }
         
         synchronized (_JAN_INFO_LOCK) {
@@ -262,14 +343,14 @@ public final class GameMaster implements Observer {
             throw new NullPointerException("Player name is null.");
         }
         if (playerName.isEmpty()) {
-            throw new NullPointerException("Player name is empty.");
+            throw new IllegalArgumentException("Player name is empty.");
         }
         if (!_playerNameList.contains(playerName)) {
             throw new IllegalArgumentException("Player is not entry : " + playerName);
         }
         
         // TODO 内部状態によって表示内容を変えたい
-        final List<String> messageList = Arrays.asList("ダミー実装につき何もできません");
+        final List<String> messageList = Arrays.asList("適当にどうぞ");
         IRCBOT.getInstance().talk(playerName, messageList);
     }
     
@@ -296,18 +377,34 @@ public final class GameMaster implements Observer {
      * 状態更新時の処理
      * 
      * @param target 監視対象オブジェクト。
-     * @param param 更新通知パラメータ。
+     * @param p 更新通知パラメータ。
      */
-    public void update(final Observable target, final Object param) {
+    public void update(final Observable target, final Object p) {
         if (!(target instanceof JanInfo)) {
             return;
         }
+        if (!(p instanceof AnnounceParam)) {
+            return;
+        }
         
-        // TODO ここで局の終了(和了or流局)を受け取りたい
-        // JanInfoにフラグ変数を持たせる？
+        final AnnounceParam param = (AnnounceParam)p;
         
-        // 直接次局に行くと _janInfo に対するデッドロックになる気がするので注意
-        // ユーザ操作(jan next とか)を待って次局に行くようにすれば回避できるので最初はそれ
+        if (param.hasFlag(AnnounceFlag.CONFIRM_CALL)) {
+            // 鳴き確認状態に遷移
+            
+            // TODO ちゃんと書けたら解禁
+            // 全員の鳴き確認結果が出揃うまで待つにはどうすれば良いか...
+            
+//          _status = GameStatus.IDLE_CALL;
+        }
+        else if (param.hasFlag(AnnounceFlag.COMPLETE_RON) ||
+                 param.hasFlag(AnnounceFlag.COMPLETE_TSUMO) ||
+                 param.hasFlag(AnnounceFlag.GAME_OVER)) {
+            // TODO 次局開始確認
+            
+            // 直接次局に行くと _janInfo に対するデッドロックになる気がするので注意
+            // ユーザ操作(jan next とか)を待って次局に行くようにすれば回避できるので最初はそれ
+        }
     }
     
     
@@ -420,6 +517,49 @@ public final class GameMaster implements Observer {
         return new VSChmJanController();
     }
     
+    /**
+     * 鳴き処理
+     * 
+     * @param info 鳴き情報。
+     * @throws JanException ゲーム処理例外。
+     */
+    private void onCall(final CallInfo info) throws JanException {
+        synchronized (_STATUS_LOCK) {
+            if (!_status.isIdleCall()) {
+                // 入力待機状態ではない場合、コマンド実行を無視
+                return;
+            }
+        }
+        
+        final String playerName = info.getPlayerName();
+        if (_callBuf.containsKey(playerName)) {
+            // 一度入力した内容は覆せない
+            return;
+        }
+        
+        _callBuf.put(playerName, info);
+        
+        if (!_callBuf.keySet().containsAll(_playerNameList)) {
+            // 全員の入力が終わるまでは先の処理に進まない
+            return;
+        }
+        
+        // 全員の入力が終わったので、最も優先度の高い処理を判定
+        // TODO 優先度判定
+        
+        // 鳴き待機状態を解除
+        _status = GameStatus.IDLE_DISCARD;
+        _callBuf.clear();
+        
+        // 最も優先度の高かった処理を実行
+//        synchronized (_JAN_INFO_LOCK) {
+//            final JanController controller = createJanController();
+//            controller.hoge(_janInfo);
+//        }
+        
+        // TODO ↑ここのコントローラ内の処理でエラーになったらどう復旧する？
+    }
+    
     
     
     /**
@@ -455,6 +595,11 @@ public final class GameMaster implements Observer {
      * 麻雀ゲーム情報
      */
     private JanInfo _janInfo = new JanInfo();
+    
+    /**
+     * 確認結果バッファ
+     */
+    private final Map<String, CallInfo> _callBuf = Collections.synchronizedMap(new HashMap<String, CallInfo>());
     
 }
 

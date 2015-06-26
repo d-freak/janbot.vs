@@ -16,6 +16,7 @@ import org.pircbotx.hooks.events.MessageEvent;
 import org.pircbotx.hooks.events.PrivateMessageEvent;
 
 import wiz.project.ircbot.IRCBOT;
+import wiz.project.janbot.game.CallType;
 import wiz.project.janbot.game.GameMaster;
 import wiz.project.janbot.game.exception.BoneheadException;
 import wiz.project.janbot.game.exception.JanException;
@@ -155,21 +156,42 @@ final class MessageListener<T extends PircBotX> extends ListenerAdapter<T> {
         final String command = commandList.get(0);
         switch (command) {
         case "d":
-            switch (commandList.size()) {
-            case 1:
-                GameMaster.getInstance().onDiscard(playerName);
-                break;
-            case 2:
-                GameMaster.getInstance().onDiscard(playerName, commandList.get(1));
-                break;
-            default:
-                // 不正な指定を無視
-                break;
+            if (!GameMaster.getInstance().getStatus().isIdleCall()) {
+                switch (commandList.size()) {
+                case 1:
+                    GameMaster.getInstance().onDiscard(playerName);
+                    break;
+                case 2:
+                    GameMaster.getInstance().onDiscard(playerName, commandList.get(1));
+                    break;
+                default:
+                    // 不正な指定を無視
+                    break;
+                }
+            }
+            else {
+                if (commandList.size() == 1) {
+                    GameMaster.getInstance().onCall(playerName);
+                }
             }
             break;
         case "tsumo":
-        case "hu":
             GameMaster.getInstance().onCompleteTsumo(playerName);
+            break;
+        case "chi":
+            if (commandList.size() == 2) {
+                GameMaster.getInstance().onCall(playerName, CallType.CHI, commandList.get(1));
+            }
+            break;
+        case "pon":
+            if (commandList.size() == 1) {
+                GameMaster.getInstance().onCall(playerName, CallType.PON);
+            }
+            break;
+        case "kan":
+            if (commandList.size() == 2) {
+                GameMaster.getInstance().onCall(playerName, CallType.CHI, commandList.get(1));
+            }
             break;
         case "h":
         case "help":
