@@ -240,6 +240,25 @@ public final class JanInfo extends Observable implements Cloneable {
     /**
      * 手牌を取得
      * 
+     * @param playerName プレイヤー名。
+     * @return 手牌。
+     */
+    public Hand getHand(final String playerName) {
+        if (playerName != null) {
+            try {
+                final Wind wind = getWind(playerName);
+                return _handTable.get(wind).clone();
+            }
+            catch (final IllegalArgumentException e) {
+                // 指定のプレイヤーが存在しなかった場合のエラーを無視
+            }
+        }
+        return new Hand();
+    }
+    
+    /**
+     * 手牌を取得
+     * 
      * @param wind 風。
      * @return 手牌。
      */
@@ -304,6 +323,23 @@ public final class JanInfo extends Observable implements Cloneable {
     /**
      * プレイヤーを取得
      * 
+     * @param playerName プレイヤー名。
+     * @return プレイヤー。
+     */
+    public Player getPlayer(final String playerName) {
+        if (playerName != null) {
+            for (final Player player : _playerTable.values()) {
+                if (player.getName().equals(playerName)) {
+                    return player;
+                }
+            }
+        }
+        return new Player();
+    }
+    
+    /**
+     * プレイヤーを取得
+     * 
      * @param wind 風。
      * @return プレイヤー。
      */
@@ -356,6 +392,23 @@ public final class JanInfo extends Observable implements Cloneable {
      */
     public WanPai getWanPai() {
         return _wanPai.clone();
+    }
+    
+    /**
+     * 風を取得
+     * 
+     * @param playerName プレイヤー名。
+     * @return 風。
+     */
+    public Wind getWind(final String playerName) {
+        if (playerName != null) {
+            for (final Map.Entry<Wind, Player> entry : _playerTable.entrySet()) {
+                if (entry.getValue().getName().equals(playerName)) {
+                    return entry.getKey();
+                }
+            }
+        }
+        throw new IllegalArgumentException("Invalid player name : " + playerName);
     }
     
     /**

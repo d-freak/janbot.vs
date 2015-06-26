@@ -1,7 +1,8 @@
 /**
  * AnnounceFlag.java
  * 
- * @author Yuki
+ * @Author
+ *   D-freak
  */
 
 package wiz.project.janbot.game;
@@ -54,9 +55,19 @@ public enum AnnounceFlag {
     CALLABLE_KAN,
     
     /**
-     * 手牌
+     * プレイヤーのターンが回ってきた
      */
-    HAND,
+    PLAYER_TURN,
+    
+    /**
+     * 手牌 (オープン)
+     */
+    HAND_OPEN,
+    
+    /**
+     * 手牌 (トーク)
+     */
+    HAND_TALK,
     
     /**
      * ツモ牌
@@ -74,9 +85,14 @@ public enum AnnounceFlag {
     AFTER_CALL,
     
     /**
-     * 場情報
+     * 場情報 (オープン)
      */
-    FIELD,
+    FIELD_OPEN,
+    
+    /**
+     * 場情報 (トーク)
+     */
+    FIELD_TALK,
     
     /**
      * 捨て牌情報

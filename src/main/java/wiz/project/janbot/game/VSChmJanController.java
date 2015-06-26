@@ -1,5 +1,8 @@
 /**
  * VSChmJanController.java
+ * 
+ * @Author
+ *   D-freak
  */
 
 package wiz.project.janbot.game;
@@ -8,17 +11,18 @@ import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
-import wiz.project.ircbot.IRCBOT;
 import wiz.project.jan.Hand;
 import wiz.project.jan.JanPai;
 import wiz.project.jan.Wind;
 import wiz.project.jan.util.HandCheckUtil;
 import wiz.project.jan.util.JanPaiUtil;
 import wiz.project.janbot.game.exception.BoneheadException;
+import wiz.project.janbot.game.exception.InvalidInputException;
 import wiz.project.janbot.game.exception.JanException;
 
 
@@ -50,9 +54,7 @@ class VSChmJanController implements JanController {
             throw new BoneheadException("Not completed.");
         }
         
-        // TODO オブザーバパターンでGameMasterに通知する
-        // 今はダミー実装ということで直接呼んだ
-        GameMaster.getInstance().update(info, null);
+        info.notifyObservers(new AnnounceParam(info.getActivePlayer(), ANNOUNCE_FLAG_COMPLETE_TSUMO));
     }
     
     /**
@@ -78,6 +80,29 @@ class VSChmJanController implements JanController {
             throw new NullPointerException("Discard target is null.");
         }
         
+        final JanPai activeTsumo = info.getActiveTsumo();
+        final Hand hand = info.getActiveHand();
+        if (hand.getMenZenMap().get(target) <= 0) {
+            if (target == activeTsumo) {
+                // 牌が指定されたがツモ切りだった
+                discard(info);
+                return;
+            }
+            // ツモ牌を含め、手牌に存在しない牌が指定された
+            throw new InvalidInputException("Invalid discard target - " + target);
+        }
+        
+        hand.removeJanPai(target);
+        
+        // TODO 鳴き直後の打牌の場合、ここで手牌に加えてはならない
+        hand.addJanPai(activeTsumo);
+        
+        // JanInfoの内部情報を更新
+        final Wind activeWind = info.getActiveWind();
+        info.setHand(activeWind, hand);
+        
+        // TODO 手変わりがあったので、ここで待ち牌リストも更新する必要あり
+        
         discardCore(info, target);
         next(info);
     }
@@ -90,12 +115,9 @@ class VSChmJanController implements JanController {
             throw new NullPointerException("Jan info is null.");
         }
         
-        if (info.getRemainCount() == 0) {
-            // TODO オブザーバパターンでGameMasterに通知する
-            // 今はダミー実装ということで直接呼んだ
-            GameMaster.getInstance().update(info, null);
-            
+        if (info.getRemainCount() <= 0) {
             // ゲーム終了
+            info.notifyObservers(new AnnounceParam(info.getActivePlayer(), ANNOUNCE_FLAG_GAME_OVER));
             return;
         }
         
@@ -191,8 +213,7 @@ class VSChmJanController implements JanController {
         info.addDiscard(activeWind, target);
         info.setActiveDiscard(target);
         
-        // TODO 直接IRCBOTを叩かずにアナウンサーにやらせたい
-        IRCBOT.getInstance().println(info.getActivePlayer().getName() + "捨牌： " + info.getActiveRiver().toString());
+        info.notifyObservers(new AnnounceParam(info.getActivePlayer(), ANNOUNCE_FLAG_DISCARD));
         
         // TODO 鳴き確認処理
     }
@@ -244,14 +265,8 @@ class VSChmJanController implements JanController {
             discard(info);
             break;
         case HUMAN:
-            // TODO 直接IRCBOTを叩かずにアナウンサーにやらせたい
-            
-            // 肉入りがアクティブになったらオープンに「○○ のターン」を表示
-            IRCBOT.getInstance().println(activePlayer.getName() + " のターン！");
-            
             // 入力待ちメッセージ
-            IRCBOT.getInstance().talk(activePlayer.getName(), info.getActiveHand().toString() + " " + activeTsumo.toString());
-            IRCBOT.getInstance().talk(activePlayer.getName(), "現状ツモ切りしかできません。");
+            info.notifyObservers(new AnnounceParam(activePlayer, ANNOUNCE_FLAG_HAND_TSUMO));
             break;
         }
     }
@@ -266,6 +281,18 @@ class VSChmJanController implements JanController {
                                                    new Player("COM_02", PlayerType.COM),
                                                    new Player("COM_03", PlayerType.COM),
                                                    new Player("COM_04", PlayerType.COM)));
+    
+    /**
+     * 実況フラグ
+     */
+    private static final EnumSet<AnnounceFlag> ANNOUNCE_FLAG_GAME_OVER =
+        EnumSet.of(AnnounceFlag.GAME_OVER, AnnounceFlag.FIELD_OPEN);
+    private static final EnumSet<AnnounceFlag> ANNOUNCE_FLAG_COMPLETE_TSUMO =
+        EnumSet.of(AnnounceFlag.COMPLETE_TSUMO, AnnounceFlag.FIELD_OPEN, AnnounceFlag.RIVER_SINGLE, AnnounceFlag.HAND_OPEN, AnnounceFlag.ACTIVE_TSUMO);
+    private static final EnumSet<AnnounceFlag> ANNOUNCE_FLAG_HAND_TSUMO =
+        EnumSet.of(AnnounceFlag.PLAYER_TURN, AnnounceFlag.HAND_TALK, AnnounceFlag.ACTIVE_TSUMO);
+    private static final EnumSet<AnnounceFlag> ANNOUNCE_FLAG_DISCARD =
+        EnumSet.of(AnnounceFlag.RIVER_SINGLE);
     
 }
 

@@ -13,7 +13,7 @@ import java.util.Objects;
 
 
 /**
- * プレイヤー
+ * プレイヤー (immutable)
  */
 final class Player implements Serializable {
     

@@ -50,6 +50,7 @@ final class MessageListener<T extends PircBotX> extends ListenerAdapter<T> {
         }
         
         // メッセージ解析
+        final String playerName = event.getUser().getNick();
         try {
             final String message = event.getMessage().replaceAll(" +", " ");  // 連続する半角スペースを削除
             if (!message.startsWith(COMMAND_PREFIX)) {
@@ -57,7 +58,6 @@ final class MessageListener<T extends PircBotX> extends ListenerAdapter<T> {
                 return;
             }
             
-            final String playerName = event.getUser().getNick();
             final List<String> commandList = Arrays.asList(message.substring(COMMAND_PREFIX.length()).split(" "));  // 半角スペースで分解
             onCommandOpen(playerName, commandList);
         }
@@ -86,6 +86,7 @@ final class MessageListener<T extends PircBotX> extends ListenerAdapter<T> {
         }
         
         // メッセージ解析
+        final String playerName = event.getUser().getNick();
         try {
             final String message = event.getMessage().replaceAll(" +", " ");  // 連続する半角スペースを削除
             if (!message.startsWith(COMMAND_PREFIX)) {
@@ -93,18 +94,17 @@ final class MessageListener<T extends PircBotX> extends ListenerAdapter<T> {
                 return;
             }
             
-            final String playerName = event.getUser().getNick();
             final List<String> commandList = Arrays.asList(message.substring(COMMAND_PREFIX.length()).split(" "));  // 半角スペースで分解
             onCommandTalk(playerName, commandList);
         }
         catch (final BoneheadException e) {
-            IRCBOT.getInstance().println("(  ´∀｀) ＜ チョンボ");
+            IRCBOT.getInstance().talk(playerName, "(  ´∀｀) ＜ チョンボ");
         }
         catch (final JanException e) {
-            IRCBOT.getInstance().println("(  ´∀｀) ＜ " + e.getMessage());
+            IRCBOT.getInstance().talk(playerName, "(  ´∀｀) ＜ " + e.getMessage());
         }
         catch (final Throwable e) {
-            IRCBOT.getInstance().println("(  ´∀｀) ＜ " + e.getMessage());
+            IRCBOT.getInstance().talk(playerName, "(  ´∀｀) ＜ " + e.getMessage());
             throw e;
         }
     }
@@ -155,8 +155,21 @@ final class MessageListener<T extends PircBotX> extends ListenerAdapter<T> {
         final String command = commandList.get(0);
         switch (command) {
         case "d":
-            // TODO ダミー機能
-            GameMaster.getInstance().onDiscard(playerName);
+            switch (commandList.size()) {
+            case 1:
+                GameMaster.getInstance().onDiscard(playerName);
+                break;
+            case 2:
+                GameMaster.getInstance().onDiscard(playerName, commandList.get(1));
+                break;
+            default:
+                // 不正な指定を無視
+                break;
+            }
+            break;
+        case "tsumo":
+        case "hu":
+            GameMaster.getInstance().onCompleteTsumo(playerName);
             break;
         case "h":
         case "help":

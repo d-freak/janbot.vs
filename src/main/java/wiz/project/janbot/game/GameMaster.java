@@ -86,7 +86,7 @@ public final class GameMaster implements Observer {
         }
         
         synchronized (_STATUS_LOCK) {
-            if (_status.isIdle()) {
+            if (!_status.isIdle()) {
                 throw new InvalidStateException("--- Not started ---");
             }
         }
@@ -232,8 +232,9 @@ public final class GameMaster implements Observer {
         }
         
         synchronized (_JAN_INFO_LOCK) {
-            // TODO アナウンサーをちゃんと実装したらここを解放
-//          _janInfo.addObserver(new GameAnnouncer());
+            _janInfo.addObserver(this);
+            _janInfo.addObserver(new OpenAnnouncer());
+            _janInfo.addObserver(new TalkAnnouncer());
             
             final JanController controller = createJanController();
             controller.startGame(_janInfo, playerNameList);
@@ -288,7 +289,7 @@ public final class GameMaster implements Observer {
         IRCBOT.getInstance().println("--- 参加プレイヤーを登録してください ---");
         IRCBOT.getInstance().println("----- IRCで現在使用しているニックネームで登録すること");
         IRCBOT.getInstance().println("----- 区切り文字には半角スペースを使用すること");
-        IRCBOT.getInstance().println("ex.) jan entry Mr.A Mr.B Mr.C");
+        IRCBOT.getInstance().println("ex.) jan entry  Mr.A  Mr.B  Mr.C  Mr.D");
     }
     
     /**
@@ -302,8 +303,8 @@ public final class GameMaster implements Observer {
             return;
         }
         
-        // TODO ダミー実装
-        IRCBOT.getInstance().println("--- 誰かがツモった or 流局 ---");
+        // TODO ここで局の終了(和了or流局)を受け取りたい
+        // JanInfoにフラグ変数を持たせる？
         
         // 直接次局に行くと _janInfo に対するデッドロックになる気がするので注意
         // ユーザ操作(jan next とか)を待って次局に行くようにすれば回避できるので最初はそれ
