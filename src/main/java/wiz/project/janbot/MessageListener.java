@@ -123,21 +123,29 @@ final class MessageListener<T extends PircBotX> extends ListenerAdapter<T> {
         final String command = commandList.get(0);
         switch (command) {
         case "--close":
-            IRCBOT.getInstance().println("(  ；∀；)");
-            IRCBOT.getInstance().disconnect();
+            if (commandList.size() == 1) {
+                IRCBOT.getInstance().println("(  ；∀；)");
+                IRCBOT.getInstance().disconnect();
+            }
             break;
         case "s":
-            GameMaster.getInstance().onStart();
+            if (commandList.size() == 1) {
+                GameMaster.getInstance().onStart();
+            }
             break;
         case "e":
-            GameMaster.getInstance().onEnd();
+            if (commandList.size() == 1) {
+                GameMaster.getInstance().onEnd();
+            }
             break;
         case "entry":
             GameMaster.getInstance().onEntry(commandList.subList(1, commandList.size()));
             break;
         case "h":
         case "help":
-            GameMaster.getInstance().onHelpOpen();
+            if (commandList.size() == 1) {
+                GameMaster.getInstance().onHelpOpen();
+            }
             break;
         default:
             // 不明なコマンドは全て無視
@@ -176,8 +184,9 @@ final class MessageListener<T extends PircBotX> extends ListenerAdapter<T> {
             }
             break;
         case "tsumo":
-            GameMaster.getInstance().onCompleteTsumo(playerName);
-            break;
+            if (commandList.size() == 1) {
+                GameMaster.getInstance().onCompleteTsumo(playerName);
+            }            break;
         case "chi":
             if (commandList.size() == 2) {
                 GameMaster.getInstance().onCall(playerName, CallType.CHI, commandList.get(1));
@@ -195,7 +204,9 @@ final class MessageListener<T extends PircBotX> extends ListenerAdapter<T> {
             break;
         case "h":
         case "help":
-            GameMaster.getInstance().onHelpTalk(playerName);
+            if (commandList.size() == 1) {
+                GameMaster.getInstance().onHelpTalk(playerName);
+            }
             break;
         default:
             // 不明なコマンドは全て無視
