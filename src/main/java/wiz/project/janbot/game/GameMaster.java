@@ -72,6 +72,37 @@ public final class GameMaster implements Observer {
     }
     
     /**
+     * ツモ和了処理
+     * 
+     * @param playerName プレイヤー名。
+     * @throws JanException ゲーム処理エラー。
+     */
+    public void onCompleteTsumo(final String playerName) throws JanException {
+        if (playerName == null) {
+            throw new NullPointerException("Player name is null.");
+        }
+        if (playerName.isEmpty()) {
+            throw new NullPointerException("Player name is empty.");
+        }
+        
+        synchronized (_STATUS_LOCK) {
+            if (_status.isIdle()) {
+                throw new InvalidStateException("--- Not started ---");
+            }
+        }
+        
+        synchronized (_JAN_INFO_LOCK) {
+            if (!playerName.equals(_janInfo.getActivePlayer().getName())) {
+                // アクティブではない状態でのコマンド実行を無視
+                return;
+            }
+            
+            final JanController controller = createJanController();
+            controller.completeTsumo(_janInfo);
+        }
+    }
+    
+    /**
      * 打牌処理 (ツモ切り)
      * 
      * @param playerName プレイヤー名。
@@ -90,7 +121,7 @@ public final class GameMaster implements Observer {
         
         synchronized (_STATUS_LOCK) {
             if (!_status.isIdle()) {
-                throw new InvalidStateException("--- Already started ---");
+                throw new InvalidStateException("--- Not started ---");
             }
         }
         
@@ -106,6 +137,48 @@ public final class GameMaster implements Observer {
     }
     
     /**
+     * 打牌処理 (手出し)
+     * 
+     * @param playerName プレイヤー名。
+     * @param target 牌の指定。
+     * @throws JanException ゲーム処理例外。
+     */
+    public void onDiscard(final String playerName, final String target) throws JanException {
+        if (playerName == null) {
+            throw new NullPointerException("Player name is null.");
+        }
+        if (playerName.isEmpty()) {
+            throw new NullPointerException("Player name is empty.");
+        }
+        if (target == null) {
+            throw new NullPointerException("Discard target is null.");
+        }
+        if (target.isEmpty()) {
+            throw new InvalidInputException("Discard target is empty.");
+        }
+        if (!_playerNameList.contains(playerName)) {
+            throw new IllegalArgumentException("Player is not entry : " + playerName);
+        }
+        
+        synchronized (_STATUS_LOCK) {
+            if (!_status.isIdle()) {
+                throw new InvalidStateException("--- Not started ---");
+            }
+        }
+        
+        synchronized (_JAN_INFO_LOCK) {
+            if (!playerName.equals(_janInfo.getActivePlayer().getName())) {
+                // アクティブではない状態でのコマンド実行を無視
+                return;
+            }
+            
+            final JanController controller = createJanController();
+            final JanPai pai = convertStringToJanPai(target);
+            controller.discard(_janInfo, pai);
+        }
+    }
+    
+    /**
      * ゲーム終了処理
      */
     public void onEnd() {
@@ -115,7 +188,7 @@ public final class GameMaster implements Observer {
             }
         }
         
-        // TODO 確認後に消したい
+        // TODO プレイヤーに確認後に消したい
         clear();
         IRCBOT.getInstance().println("--- 終了 ---");
     }
@@ -230,7 +303,7 @@ public final class GameMaster implements Observer {
         }
         
         // TODO ダミー実装
-        IRCBOT.getInstance().println("--- 流局した気がする ---");
+        IRCBOT.getInstance().println("--- 誰かがツモった or 流局 ---");
         
         // 直接次局に行くと _janInfo に対するデッドロックになる気がするので注意
         // ユーザ操作(jan next とか)を待って次局に行くようにすれば回避できるので最初はそれ

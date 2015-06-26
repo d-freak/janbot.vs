@@ -16,7 +16,9 @@ import wiz.project.ircbot.IRCBOT;
 import wiz.project.jan.Hand;
 import wiz.project.jan.JanPai;
 import wiz.project.jan.Wind;
+import wiz.project.jan.util.HandCheckUtil;
 import wiz.project.jan.util.JanPaiUtil;
+import wiz.project.janbot.game.exception.BoneheadException;
 import wiz.project.janbot.game.exception.JanException;
 
 
@@ -38,13 +40,29 @@ class VSChmJanController implements JanController {
      * 和了 (ツモ)
      */
     public void completeTsumo(final JanInfo info) throws JanException {
-        // TODO 未実装
+        if (info == null) {
+            throw new NullPointerException("Jan info is null.");
+        }
+        
+        final Map<JanPai, Integer> handWithTsumo = getHandMap(info, info.getActiveWind(), info.getActiveTsumo());
+        if (!HandCheckUtil.isComplete(handWithTsumo)) {
+            // チョンボ
+            throw new BoneheadException("Not completed.");
+        }
+        
+        // TODO オブザーバパターンでGameMasterに通知する
+        // 今はダミー実装ということで直接呼んだ
+        GameMaster.getInstance().update(info, null);
     }
     
     /**
      * 打牌 (ツモ切り)
      */
     public void discard(final JanInfo info) throws JanException {
+        if (info == null) {
+            throw new NullPointerException("Jan info is null.");
+        }
+        
         discardCore(info, info.getActiveTsumo());
         next(info);
     }
@@ -53,7 +71,15 @@ class VSChmJanController implements JanController {
      * 打牌 (手出し)
      */
     public void discard(final JanInfo info, final JanPai target) throws JanException {
-        // TODO 未実装
+        if (info == null) {
+            throw new NullPointerException("Jan info is null.");
+        }
+        if (target == null) {
+            throw new NullPointerException("Discard target is null.");
+        }
+        
+        discardCore(info, target);
+        next(info);
     }
     
     /**
@@ -172,6 +198,21 @@ class VSChmJanController implements JanController {
     }
     
     /**
+     * 指定牌込みでプレイヤーの手牌マップを取得
+     * 
+     * @param info ゲーム情報。
+     * @param wind プレイヤーの風。
+     * @param source 手牌に追加する牌。
+     * @return プレイヤーの手牌マップ。
+     */
+    private Map<JanPai, Integer> getHandMap(final JanInfo info, final Wind wind, final JanPai source) {
+        final Map<JanPai, Integer> hand = info.getHand(wind).getMenZenMap();
+        JanPaiUtil.addJanPai(hand, source, 1);
+        JanPaiUtil.cleanJanPaiMap(hand);
+        return hand;
+    }
+    
+    /**
      * 牌をツモる
      * 
      * @param info ゲーム情報。
@@ -205,7 +246,7 @@ class VSChmJanController implements JanController {
         case HUMAN:
             // TODO 直接IRCBOTを叩かずにアナウンサーにやらせたい
             
-            // 肉入りがアクティブになったらオープンに「○○ のターン」を表示？
+            // 肉入りがアクティブになったらオープンに「○○ のターン」を表示
             IRCBOT.getInstance().println(activePlayer.getName() + " のターン！");
             
             // 入力待ちメッセージ
