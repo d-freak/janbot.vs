@@ -16,6 +16,7 @@ import org.pircbotx.hooks.events.MessageEvent;
 import org.pircbotx.hooks.events.PrivateMessageEvent;
 
 import wiz.project.ircbot.IRCBOT;
+import wiz.project.janbot.game.CallType;
 import wiz.project.janbot.game.GameMaster;
 import wiz.project.janbot.game.exception.BoneheadException;
 import wiz.project.janbot.game.exception.JanException;
@@ -122,21 +123,29 @@ final class MessageListener<T extends PircBotX> extends ListenerAdapter<T> {
         final String command = commandList.get(0);
         switch (command) {
         case "--close":
-            IRCBOT.getInstance().println("(  ；∀；)");
-            IRCBOT.getInstance().disconnect();
+            if (commandList.size() == 1) {
+                IRCBOT.getInstance().println("(  ；∀；)");
+                IRCBOT.getInstance().disconnect();
+            }
             break;
         case "s":
-            GameMaster.getInstance().onStart();
+            if (commandList.size() == 1) {
+                GameMaster.getInstance().onStart();
+            }
             break;
         case "e":
-            GameMaster.getInstance().onEnd();
+            if (commandList.size() == 1) {
+                GameMaster.getInstance().onEnd();
+            }
             break;
         case "entry":
             GameMaster.getInstance().onEntry(commandList.subList(1, commandList.size()));
             break;
         case "h":
         case "help":
-            GameMaster.getInstance().onHelpOpen();
+            if (commandList.size() == 1) {
+                GameMaster.getInstance().onHelpOpen();
+            }
             break;
         default:
             // 不明なコマンドは全て無視
@@ -155,25 +164,50 @@ final class MessageListener<T extends PircBotX> extends ListenerAdapter<T> {
         final String command = commandList.get(0);
         switch (command) {
         case "d":
-            switch (commandList.size()) {
-            case 1:
-                GameMaster.getInstance().onDiscard(playerName);
-                break;
-            case 2:
-                GameMaster.getInstance().onDiscard(playerName, commandList.get(1));
-                break;
-            default:
-                // 不正な指定を無視
-                break;
+            if (!GameMaster.getInstance().getStatus().isIdleCall()) {
+                switch (commandList.size()) {
+                case 1:
+                    GameMaster.getInstance().onDiscard(playerName);
+                    break;
+                case 2:
+                    GameMaster.getInstance().onDiscard(playerName, commandList.get(1));
+                    break;
+                default:
+                    // 不正な指定を無視
+                    break;
+                }
+            }
+            else {
+                if (commandList.size() == 1) {
+                    GameMaster.getInstance().onCall(playerName);
+                }
             }
             break;
         case "tsumo":
-        case "hu":
-            GameMaster.getInstance().onCompleteTsumo(playerName);
+            if (commandList.size() == 1) {
+                GameMaster.getInstance().onCompleteTsumo(playerName);
+            }
+            break;
+        case "chi":
+            if (commandList.size() == 2) {
+                GameMaster.getInstance().onCall(playerName, CallType.CHI, commandList.get(1));
+            }
+            break;
+        case "pon":
+            if (commandList.size() == 1) {
+                GameMaster.getInstance().onCall(playerName, CallType.PON);
+            }
+            break;
+        case "kan":
+            if (commandList.size() == 2) {
+                GameMaster.getInstance().onCall(playerName, CallType.CHI, commandList.get(1));
+            }
             break;
         case "h":
         case "help":
-            GameMaster.getInstance().onHelpTalk(playerName);
+            if (commandList.size() == 1) {
+                GameMaster.getInstance().onHelpTalk(playerName);
+            }
             break;
         default:
             // 不明なコマンドは全て無視
