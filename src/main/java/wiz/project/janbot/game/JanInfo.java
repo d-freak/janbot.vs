@@ -67,6 +67,9 @@ public final class JanInfo extends Observable implements Cloneable {
             for (final Map.Entry<Wind, Map<CallType, List<JanPai>>> entry : source._waitTable.entrySet()) {
                 _waitTable.put(entry.getKey(), deepCopyWaitTable(entry.getValue()));
             }
+            for (final Map.Entry<Wind, List<CallType>> entry : source._callableTable.entrySet()) {
+                _callableTable.put(entry.getKey(), deepCopyList(entry.getValue()));
+            }
         }
     }
     
@@ -102,6 +105,7 @@ public final class JanInfo extends Observable implements Cloneable {
         _activeTsumo = JanPai.HAKU;
         _activeDiscard = JanPai.HAKU;
         _completeInfo = null;
+        clearCallableTable();
         
         for (final Wind wind : Wind.values()) {
             _playerTable.put(wind, new Player());
@@ -112,6 +116,15 @@ public final class JanInfo extends Observable implements Cloneable {
                 waitTable.put(type, Collections.synchronizedList(new ArrayList<JanPai>()));
             }
             _waitTable.put(wind, waitTable);
+        }
+    }
+    
+    /**
+     * 鳴き可能テーブルを消去
+     */
+    public void clearCallableTable() {
+        for (final Wind wind : Wind.values()) {
+            _callableTable.put(wind, Collections.synchronizedList(new ArrayList<CallType>()));
         }
     }
     
@@ -186,6 +199,36 @@ public final class JanInfo extends Observable implements Cloneable {
      */
     public Wind getActiveWind() {
         return _activeWind;
+    }
+    
+    /**
+     * 鳴き可能リストを取得
+     * 
+     * @param wind 風。
+     * @return 鳴き可能リスト。
+     */
+    public List<CallType> getCallableList(final Wind wind) {
+        if (wind != null) {
+            return deepCopyList(_callableTable.get(wind));
+        }
+        else {
+            return Collections.synchronizedList(new ArrayList<CallType>());
+        }
+    }
+    
+    /**
+     * 鳴き可能なプレイヤー名リストを取得
+     * 
+     * @return 鳴き可能なプレイヤー名リスト。
+     */
+    public List<String> getCallablePlayerNameList() {
+        final List<String> resultList = new ArrayList<>();
+        for (final Map.Entry<Wind, List<CallType>> entry : _callableTable.entrySet()) {
+            if (!entry.getValue().isEmpty()) {
+                resultList.add(_playerTable.get(entry.getKey()).getName());
+            }
+        }
+        return resultList;
     }
     
     /**
@@ -570,6 +613,23 @@ public final class JanInfo extends Observable implements Cloneable {
     }
     
     /**
+     * 鳴き可能リストを設定
+     * 
+     * @param wind 風。
+     * @param callableList 鳴き可能リスト。
+     */
+    public void setCallableList(final Wind wind, final List<CallType> callableList) {
+        if (wind != null) {
+            if (callableList != null) {
+                _callableTable.put(wind, deepCopyList(callableList));
+            }
+            else {
+                _callableTable.put(wind, Collections.synchronizedList(new ArrayList<CallType>()));
+            }
+        }
+    }
+    
+    /**
      * 被副露牌インデックスを設定
      * 
      * @param wind 副露された風。
@@ -876,6 +936,14 @@ public final class JanInfo extends Observable implements Cloneable {
      * 待ち牌テーブル
      */
     private final Map<Wind, Map<CallType, List<JanPai>>> _waitTable = Collections.synchronizedMap(new TreeMap<Wind, Map<CallType, List<JanPai>>>());
+    
+    /**
+     * 鳴き可能テーブル
+     * 
+     * 待ち牌テーブルから算出可能だが、ロン可否の判定コストが重いため
+     * キャッシュも兼ねて別メンバとして持つ
+     */
+    private final Map<Wind, List<CallType>> _callableTable = Collections.synchronizedMap(new TreeMap<Wind, List<CallType>>());
     
     /**
      * 牌山

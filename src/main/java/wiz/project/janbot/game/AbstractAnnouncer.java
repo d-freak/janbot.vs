@@ -50,6 +50,47 @@ abstract class AbstractAnnouncer implements Announcer {
     }
     
     /**
+     * 副露情報を文字列に変換
+     * 
+     * @param callableList 可能な鳴きリスト。
+     * @param discard 捨て牌。
+     * @return 変換結果。
+     */
+    protected final String convertCallInfoToString(final List<CallType> callableList, final JanPai discard) {
+        if (callableList == null) {
+            throw new NullPointerException("Callable list is null.");
+        }
+        if (callableList.isEmpty()) {
+            throw new IllegalArgumentException("Callable list is empty.");
+        }
+        if (discard == null) {
+            throw new NullPointerException("Discard janpai is null.");
+        }
+        
+        final StringBuilder buf = new StringBuilder();
+        buf.append(convertJanPaiToString(discard)).append(" <- ");
+        if (callableList.contains(CallType.RON)) {
+            buf.append("ロン可能です：  ");
+        }
+        else {
+            buf.append("鳴けそうです：  ");
+        }
+        if (callableList.contains(CallType.RON)) {
+            buf.append("[ロン]");
+        }
+        if (callableList.contains(CallType.CHI)) {
+            buf.append("[チー]");
+        }
+        if (callableList.contains(CallType.PON)) {
+            buf.append("[ポン]");
+        }
+        if (callableList.contains(CallType.KAN_LIGHT)) {
+            buf.append("[カン]");
+        }
+        return buf.toString();
+    }
+    
+    /**
      * 場情報を文字列に変換
      * 
      * @param info ゲーム情報。
@@ -235,7 +276,7 @@ abstract class AbstractAnnouncer implements Announcer {
         final StringBuilder buf = new StringBuilder();
         int count = 1;
         int calledIndex = 0;
-        buf.append(playerName + "捨牌：");
+        buf.append(playerWind + "：" + playerName + "捨牌：");
         for (final JanPai pai : river.get()) {
             if (calledIndex < river.getCalledIndexList().size() && count == river.getCalledIndexList().get(calledIndex)) {
                 buf.append(convertCalledJanPaiToString(pai));

@@ -17,6 +17,9 @@ import wiz.project.ircbot.IRCBOT;
 
 /**
  * オープン実況
+ * 
+ * 理論上オープンでいい内容は全てここに集約する。
+ * ただし、IRCプレイでの利便性を考えて一部メッセージはトークに流す。
  */
 public class OpenAnnouncer extends AbstractAnnouncer {
     

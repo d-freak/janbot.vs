@@ -35,9 +35,19 @@ public enum AnnounceFlag {
     GAME_OVER,
     
     /**
+     * 打牌
+     */
+    DISCARD,
+    
+    /**
      * 鳴き確認
      */
     CONFIRM_CALL,
+    
+    /**
+     * 誰も鳴けない
+     */
+    NOBODY_CALL,
     
     /**
      * ロン可能

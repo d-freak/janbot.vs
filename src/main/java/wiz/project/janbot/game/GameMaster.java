@@ -123,7 +123,16 @@ public final class GameMaster implements Observer {
             throw new IllegalArgumentException("Player is not entry : " + playerName);
         }
         
-        onCall(new CallInfo(playerName));
+        synchronized (_STATUS_LOCK) {
+            if (!_status.isIdleCall()) {
+                // 入力待機状態ではない場合、コマンド実行を無視
+                return;
+            }
+            
+            synchronized (_JAN_INFO_LOCK) {
+                onCall(new CallInfo(playerName));
+            }
+        }
     }
     
     /**
@@ -147,7 +156,16 @@ public final class GameMaster implements Observer {
             throw new NullPointerException("Call type is null.");
         }
         
-        onCall(new CallInfo(playerName, type));
+        synchronized (_STATUS_LOCK) {
+            if (!_status.isIdleCall()) {
+                // 入力待機状態ではない場合、コマンド実行を無視
+                return;
+            }
+            
+            synchronized (_JAN_INFO_LOCK) {
+                onCall(new CallInfo(playerName, type));
+            }
+        }
     }
     
     /**
@@ -178,7 +196,16 @@ public final class GameMaster implements Observer {
             throw new IllegalArgumentException("Target janpai is empty.");
         }
         
-        onCall(new CallInfo(playerName, type, convertStringToJanPai(target)));
+        synchronized (_STATUS_LOCK) {
+            if (!_status.isIdleCall()) {
+                // 入力待機状態ではない場合、コマンド実行を無視
+                return;
+            }
+            
+            synchronized (_JAN_INFO_LOCK) {
+                onCall(new CallInfo(playerName, type, convertStringToJanPai(target)));
+            }
+        }
     }
     
     /**
@@ -383,28 +410,19 @@ public final class GameMaster implements Observer {
         if (!(target instanceof JanInfo)) {
             return;
         }
-        if (!(p instanceof AnnounceParam)) {
+        if (!(p instanceof GameStatusParam)) {
             return;
         }
         
-        final AnnounceParam param = (AnnounceParam)p;
+        final GameStatusParam param = (GameStatusParam)p;
+        synchronized (_STATUS_LOCK) {
+            _status = param.getStatus();
+        }
         
-        if (param.hasFlag(AnnounceFlag.CONFIRM_CALL)) {
-            // 鳴き確認状態に遷移
-            
-            // TODO ちゃんと書けたら解禁
-            // 全員の鳴き確認結果が出揃うまで待つにはどうすれば良いか...
-            
-//          _status = GameStatus.IDLE_CALL;
-        }
-        else if (param.hasFlag(AnnounceFlag.COMPLETE_RON) ||
-                 param.hasFlag(AnnounceFlag.COMPLETE_TSUMO) ||
-                 param.hasFlag(AnnounceFlag.GAME_OVER)) {
-            // TODO 次局開始確認
-            
-            // 直接次局に行くと _janInfo に対するデッドロックになる気がするので注意
-            // ユーザ操作(jan next とか)を待って次局に行くようにすれば回避できるので最初はそれ
-        }
+        // 鳴き確認バッファをクリア
+        _callBuf.clear();
+        
+        // TODO 状態が END_ROUND になったら次局開始操作が必要？
     }
     
     
@@ -524,13 +542,6 @@ public final class GameMaster implements Observer {
      * @throws JanException ゲーム処理例外。
      */
     private void onCall(final CallInfo info) throws JanException {
-        synchronized (_STATUS_LOCK) {
-            if (!_status.isIdleCall()) {
-                // 入力待機状態ではない場合、コマンド実行を無視
-                return;
-            }
-        }
-        
         final String playerName = info.getPlayerName();
         if (_callBuf.containsKey(playerName)) {
             // 一度入力した内容は覆せない
@@ -539,7 +550,7 @@ public final class GameMaster implements Observer {
         
         _callBuf.put(playerName, info);
         
-        if (!_callBuf.keySet().containsAll(_playerNameList)) {
+        if (!_callBuf.keySet().containsAll(_janInfo.getCallablePlayerNameList())) {
             // 全員の入力が終わるまでは先の処理に進まない
             return;
         }
@@ -547,17 +558,20 @@ public final class GameMaster implements Observer {
         // 全員の入力が終わったので、最も優先度の高い処理を判定
         // TODO 優先度判定
         
-        // 鳴き待機状態を解除
-        _status = GameStatus.IDLE_DISCARD;
-        _callBuf.clear();
-        
-        // 最も優先度の高かった処理を実行
-//        synchronized (_JAN_INFO_LOCK) {
-//            final JanController controller = createJanController();
-//            controller.hoge(_janInfo);
-//        }
-        
-        // TODO ↑ここのコントローラ内の処理でエラーになったらどう復旧する？
+        try {
+            // TODO 最も優先度の高かった処理を実行
+            // 現状全員がパスした場合の挙動に固定
+            final JanController controller = createJanController();
+            controller.next(_janInfo);
+            
+            // 鳴き待機状態を解除
+            _status = GameStatus.IDLE_DISCARD;
+            _callBuf.clear();
+        }
+        catch (final Throwable e) {
+            // TODO コントローラ内の処理でエラーになったらどう復旧する？
+            throw e;
+        }
     }
     
     

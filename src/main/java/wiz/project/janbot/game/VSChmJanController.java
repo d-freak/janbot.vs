@@ -66,7 +66,9 @@ class VSChmJanController implements JanController {
         }
         
         discardCore(info, info.getActiveTsumo());
-        next(info);
+        if (info.getCallablePlayerNameList().isEmpty()) {
+            next(info);
+        }
     }
     
     /**
@@ -104,7 +106,9 @@ class VSChmJanController implements JanController {
         
         // 牌を捨てる
         discardCore(info, target);
-        next(info);
+        if (info.getCallablePlayerNameList().isEmpty()) {
+            next(info);
+        }
     }
     
     /**
@@ -189,12 +193,31 @@ class VSChmJanController implements JanController {
             }
         }
         
+        info.notifyObservers(new AnnounceParam(info.getActivePlayer(), ANNOUNCE_FLAG_GAME_START));
+        
         // 一巡目へ (親の14枚目はこの先でツモらせる)
         info.setActiveWind(Wind.TON);
         onPhase(info);
     }
     
     
+    
+    /**
+     * 鳴き可能リストを生成
+     * 
+     * @param waitTable 待ち牌テーブル。
+     * @param target 確認対象牌。
+     * @return 鳴き可能リスト。
+     */
+    private List<CallType> createCallableList(final Map<CallType, List<JanPai>> waitTable, final JanPai target) {
+        final List<CallType> resultList = new ArrayList<>();
+        for (final Map.Entry<CallType, List<JanPai>> entry : waitTable.entrySet()) {
+            if (entry.getValue().contains(target)) {
+                resultList.add(entry.getKey());
+            }
+        }
+        return resultList;
+    }
     
     /**
      * 牌山を生成
@@ -218,36 +241,35 @@ class VSChmJanController implements JanController {
         info.addDiscard(activeWind, target);
         info.setActiveDiscard(target);
         
-        info.notifyObservers(new AnnounceParam(info.getActivePlayer(), ANNOUNCE_FLAG_DISCARD));
+        final Player activePlayer = info.getActivePlayer();
+        info.notifyObservers(new AnnounceParam(activePlayer, ANNOUNCE_FLAG_DISCARD));
         
         // 鳴き確認処理
+        final List<Player> callerList = new ArrayList<>();
         for (final Wind wind : Wind.values()) {
-            final List<AnnounceFlag> callableList = new ArrayList<>();
-            final Map<CallType, List<JanPai>> table = info.getWaitTable(wind);
-            for (final Map.Entry<CallType, List<JanPai>> entry : table.entrySet()) {
-                if (entry.getValue().contains(target)) {
-                    switch (entry.getKey()) {
-                    case CHI:
-                        callableList.add(AnnounceFlag.CALLABLE_CHI);
-                        break;
-                    case PON:
-                        callableList.add(AnnounceFlag.CALLABLE_PON);
-                        break;
-                    case KAN_LIGHT:
-                        callableList.add(AnnounceFlag.CALLABLE_KAN);
-                        break;
-                    case RON:
-                        callableList.add(AnnounceFlag.CALLABLE_RON);
-                        break;
-                    default:
-                        break;
-                    }
-                }
+            final Player player = info.getPlayer(wind);
+            if (player.getType() != PlayerType.HUMAN) {
+                // CPUは無視
+                continue;
             }
-            // TODO このcallableListはJanInfoにテーブル形式で持たせて上まで回そうと思う
             
-            // マルチスレッド化しなくてもいいはず
-            info.notifyObservers(new AnnounceParam(info.getPlayer(wind), EnumSet.copyOf(callableList)));
+            final List<CallType> callableList = createCallableList(info.getWaitTable(wind), target);
+            if (callableList.isEmpty()) {
+                // 鳴けない場合は無視
+                continue;
+            }
+            
+            // 確認メッセージを出すところまでで次のループに移るので、
+            // マルチスレッド化の必要無し
+            info.setCallableList(wind, callableList);
+            callerList.add(player);
+        }
+        
+        if (!callerList.isEmpty()) {
+            info.notifyObservers(new GameStatusParam(activePlayer, GameStatus.IDLE_CALL));
+            for (final Player caller : callerList) {
+                info.notifyObservers(new AnnounceParam(caller, ANNOUNCE_FLAG_CONFIRM_CALL));
+            }
         }
     }
     
@@ -422,7 +444,9 @@ class VSChmJanController implements JanController {
         final Map<JanPai, Integer> hand = getHandMap(info, wind);
         final Map<CallType, List<JanPai>> waitTable = info.getWaitTable(wind);
         waitTable.put(CallType.RON, HandCheckUtil.getCompletableJanPaiList(hand));
-        waitTable.put(CallType.CHI, getChiWaitList(hand));
+        if (info.getActiveWind().getNext() == wind) {
+            waitTable.put(CallType.CHI, getChiWaitList(hand));
+        }
         waitTable.put(CallType.PON, getPonWaitList(hand));
         waitTable.put(CallType.KAN_LIGHT, getKanLightWaitList(hand));
         info.setWaitTable(wind, waitTable);
@@ -442,6 +466,8 @@ class VSChmJanController implements JanController {
     /**
      * 実況フラグ
      */
+    private static final EnumSet<AnnounceFlag> ANNOUNCE_FLAG_GAME_START =
+        EnumSet.of(AnnounceFlag.FIELD_OPEN);
     private static final EnumSet<AnnounceFlag> ANNOUNCE_FLAG_GAME_OVER =
         EnumSet.of(AnnounceFlag.GAME_OVER, AnnounceFlag.FIELD_OPEN);
     private static final EnumSet<AnnounceFlag> ANNOUNCE_FLAG_COMPLETE_TSUMO =
@@ -449,7 +475,9 @@ class VSChmJanController implements JanController {
     private static final EnumSet<AnnounceFlag> ANNOUNCE_FLAG_HAND_TSUMO =
         EnumSet.of(AnnounceFlag.PLAYER_TURN, AnnounceFlag.HAND_TALK, AnnounceFlag.ACTIVE_TSUMO);
     private static final EnumSet<AnnounceFlag> ANNOUNCE_FLAG_DISCARD =
-        EnumSet.of(AnnounceFlag.RIVER_SINGLE);
+        EnumSet.of(AnnounceFlag.DISCARD, AnnounceFlag.RIVER_SINGLE);
+    private static final EnumSet<AnnounceFlag> ANNOUNCE_FLAG_CONFIRM_CALL =
+        EnumSet.of(AnnounceFlag.CONFIRM_CALL, AnnounceFlag.FIELD_TALK, AnnounceFlag.HAND_TALK);
     
 }
 

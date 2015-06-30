@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Observable;
 
 import wiz.project.ircbot.IRCBOT;
+import wiz.project.jan.JanPai;
 import wiz.project.jan.Wind;
 
 
@@ -49,14 +50,18 @@ public class TalkAnnouncer extends AbstractAnnouncer {
         final Wind playerWind = info.getWind(player.getName());
         
         final List<String> messageList = new ArrayList<>();
+        if (param.hasFlag(AnnounceFlag.CONFIRM_CALL)) {
+            final List<CallType> callableList = info.getCallableList(playerWind);
+            final JanPai discard = info.getActiveDiscard();
+            messageList.add(convertCallInfoToString(callableList, discard));
+            messageList.add("(現状 jan d で飛ばすことしかできません)");
+        }
         if (param.hasFlag(AnnounceFlag.FIELD_TALK)) {
             messageList.add(convertFieldToString(info, playerWind));
         }
         if (param.hasFlag(AnnounceFlag.HAND_TALK)) {
             messageList.add(convertHandToString(info, param));
         }
-        
-        // TODO 鳴き確認メッセージを出す
         
         if (param.hasFlag(AnnounceFlag.COMPLETE_RON)) {
             messageList.add("---- ロン和了 ----");
