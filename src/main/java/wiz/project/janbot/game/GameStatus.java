@@ -35,6 +35,11 @@ public enum GameStatus {
     IDLE_CALL,
     
     /**
+     * 鳴き直後
+     */
+    AFTER_CALL,
+    
+    /**
      * 局が終了
      */
     END_ROUND,
@@ -45,6 +50,15 @@ public enum GameStatus {
     CLOSE;
     
     
+    
+    /**
+     * 鳴き直後か
+     * 
+     * @return 判定結果。
+     */
+    public boolean isAfterCall() {
+        return this == AFTER_CALL;
+    }
     
     /**
      * 未開始か
@@ -85,7 +99,12 @@ public enum GameStatus {
      * @return 判定結果。
      */
     public boolean isIdleDiscard() {
-        return this == IDLE_DISCARD;
+        switch (this) {
+        case IDLE_DISCARD:
+            return true;
+        default:
+            return false;
+        }
     }
     
     /**

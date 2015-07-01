@@ -54,7 +54,6 @@ public class TalkAnnouncer extends AbstractAnnouncer {
             final List<CallType> callableList = info.getCallableList(playerWind);
             final JanPai discard = info.getActiveDiscard();
             messageList.add(convertCallInfoToString(callableList, discard));
-            messageList.add("(現状 jan d で飛ばすことしかできません)");
         }
         if (param.hasFlag(AnnounceFlag.FIELD_TALK)) {
             messageList.add(convertFieldToString(info, playerWind));

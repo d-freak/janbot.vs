@@ -186,7 +186,8 @@ final class MessageListener<T extends PircBotX> extends ListenerAdapter<T> {
         case "tsumo":
             if (commandList.size() == 1) {
                 GameMaster.getInstance().onCompleteTsumo(playerName);
-            }            break;
+            }
+            break;
         case "chi":
             if (commandList.size() == 2) {
                 GameMaster.getInstance().onCall(playerName, CallType.CHI, commandList.get(1));
@@ -199,7 +200,13 @@ final class MessageListener<T extends PircBotX> extends ListenerAdapter<T> {
             break;
         case "kan":
             if (commandList.size() == 2) {
-                GameMaster.getInstance().onCall(playerName, CallType.CHI, commandList.get(1));
+                if (!GameMaster.getInstance().getStatus().isIdleCall()) {
+                    // この時点では手牌を確認できないので、加槓も KAN_DARK ルートから入る
+                    GameMaster.getInstance().onCall(playerName, CallType.KAN_DARK, commandList.get(1));
+                }
+                else {
+                    GameMaster.getInstance().onCall(playerName, CallType.KAN_LIGHT, commandList.get(1));
+                }
             }
             break;
         case "h":

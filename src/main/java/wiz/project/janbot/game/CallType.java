@@ -42,7 +42,28 @@ public enum CallType {
     /**
      * 暗カン
      */
-    KAN_DARK,
+    KAN_DARK;
+    
+    
+    
+    /**
+     * 優先度を取得
+     * 
+     * @return 優先度。
+     */
+    public int getPriority() {
+        switch (this) {
+        case RON:
+            return 3;
+        case PON:
+        case KAN_LIGHT:
+            return 2;
+        case CHI:
+            return 1;
+        default:
+            return 0;
+        }
+    }
     
 }
 

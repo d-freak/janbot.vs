@@ -204,6 +204,22 @@ public final class JanInfo extends Observable implements Cloneable {
     /**
      * 鳴き可能リストを取得
      * 
+     * @param playerName プレイヤー名。
+     * @return 鳴き可能リスト。
+     */
+    public List<CallType> getCallableList(final String playerName) {
+        if (playerName != null) {
+            final Wind wind = getWind(playerName);
+            return deepCopyList(_callableTable.get(wind));
+        }
+        else {
+            return Collections.synchronizedList(new ArrayList<CallType>());
+        }
+    }
+    
+    /**
+     * 鳴き可能リストを取得
+     * 
      * @param wind 風。
      * @return 鳴き可能リスト。
      */

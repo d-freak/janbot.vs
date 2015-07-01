@@ -15,9 +15,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Observable;
 import java.util.Observer;
+import java.util.TreeMap;
 
 import wiz.project.ircbot.IRCBOT;
 import wiz.project.jan.JanPai;
+import wiz.project.jan.Wind;
 import wiz.project.janbot.game.exception.InvalidInputException;
 import wiz.project.janbot.game.exception.InvalidStateException;
 import wiz.project.janbot.game.exception.JanException;
@@ -125,7 +127,7 @@ public final class GameMaster implements Observer {
         
         synchronized (_STATUS_LOCK) {
             if (!_status.isIdleCall()) {
-                // 入力待機状態ではない場合、コマンド実行を無視
+                // 鳴き待機状態ではない場合、コマンド実行を無視
                 return;
             }
             
@@ -158,7 +160,7 @@ public final class GameMaster implements Observer {
         
         synchronized (_STATUS_LOCK) {
             if (!_status.isIdleCall()) {
-                // 入力待機状態ではない場合、コマンド実行を無視
+                // 鳴き待機状態ではない場合、コマンド実行を無視
                 return;
             }
             
@@ -197,13 +199,22 @@ public final class GameMaster implements Observer {
         }
         
         synchronized (_STATUS_LOCK) {
-            if (!_status.isIdleCall()) {
-                // 入力待機状態ではない場合、コマンド実行を無視
-                return;
-            }
-            
-            synchronized (_JAN_INFO_LOCK) {
-                onCall(new CallInfo(playerName, type, convertStringToJanPai(target)));
+            switch (_status) {
+            case IDLE_DISCARD:
+                // 暗槓/加槓
+                synchronized (_JAN_INFO_LOCK) {
+                    final JanController controller = createJanController();
+                    controller.kanHand(_janInfo, convertStringToJanPai(target));
+                }
+                break;
+            case IDLE_CALL:
+                // 明槓
+                synchronized (_JAN_INFO_LOCK) {
+                    onCall(new CallInfo(playerName, type, convertStringToJanPai(target)));
+                }
+                break;
+            default:
+                break;
             }
         }
     }
@@ -268,7 +279,7 @@ public final class GameMaster implements Observer {
         }
         
         synchronized (_STATUS_LOCK) {
-            if (!_status.isIdleDiscard()) {
+            if (!_status.isIdleDiscard() && !_status.isAfterCall()) {
                 // 入力待機状態ではない場合、コマンド実行を無視
                 return;
             }
@@ -422,7 +433,7 @@ public final class GameMaster implements Observer {
         // 鳴き確認バッファをクリア
         _callBuf.clear();
         
-        // TODO 状態が END_ROUND になったら次局開始操作が必要？
+        // TODO 状態が END_ROUND になったら次局開始操作が必要
     }
     
     
@@ -536,6 +547,82 @@ public final class GameMaster implements Observer {
     }
     
     /**
+     * マップをディープコピー
+     * 
+     * @param source 複製元。
+     * @return 複製結果。
+     */
+    private <S, T> Map<S, T> deepCopyMap(final Map<S, T> source) {
+        return Collections.synchronizedMap(new TreeMap<S, T>(source));
+    }
+    
+    /**
+     * 優先度が最も高い鳴き情報を取得
+     * 
+     * @return 優先度が最も高い鳴き情報。(全員が鳴き放棄した場合はnullを返す)
+     */
+    private CallInfo getHighPriorityCall() {
+        CallInfo highest = null;
+        for (final CallInfo target : _callBuf.values()) {
+            if (highest == null) {
+                highest = target;
+                continue;
+            }
+            
+            // 鳴き放棄の確認
+            final CallType targetCallType = target.getCallType();
+            final CallType highestCallType = highest.getCallType();
+            if (targetCallType == null) {
+                continue;
+            }
+            if (highestCallType == null) {
+                highest = target;
+                continue;
+            }
+            
+            // 鳴きタイプの優先度確認
+            final int targetPriority =targetCallType.getPriority();
+            final int highestPriority = highestCallType.getPriority();
+            if (targetPriority < highestPriority) {
+                continue;
+            }
+            if (targetPriority > highestPriority) {
+                highest = target;
+                continue;
+            }
+            
+            // 頭ハネの優先度確認
+            // TODO 雑すぎるからそのうち直したい...
+            final Wind targetWind = _janInfo.getWind(target.getPlayerName());
+            final Wind highestWind = _janInfo.getWind(highest.getPlayerName());
+            final Wind activeWind = _janInfo.getActiveWind();
+            
+            int targetCount = 0;
+            int highestCount = 0;
+            int count = 3;
+            for (Wind wind = activeWind.getNext(); wind != activeWind; wind = wind.getNext()) {
+                if (wind == targetWind) {
+                    targetCount = count;
+                }
+                else if (wind == highestWind) {
+                    highestCount = count;
+                }
+                count--;
+            }
+            
+            if (targetCount > highestCount) {
+                highest = target;
+            }
+        }
+        
+        if (highest != null && highest.getCallType() == null) {
+            // CallTypeが null であるオブジェクトを返さないための処置
+            return null;
+        }
+        return highest;
+    }
+    
+    /**
      * 鳴き処理
      * 
      * @param info 鳴き情報。
@@ -548,6 +635,11 @@ public final class GameMaster implements Observer {
             return;
         }
         
+        if (_janInfo.getCallableList(playerName).contains(info.getCallType())) {
+            // 鳴き可能リストに入っていない
+            return;
+        }
+        
         _callBuf.put(playerName, info);
         
         if (!_callBuf.keySet().containsAll(_janInfo.getCallablePlayerNameList())) {
@@ -555,22 +647,46 @@ public final class GameMaster implements Observer {
             return;
         }
         
-        // 全員の入力が終わったので、最も優先度の高い処理を判定
-        // TODO 優先度判定
+        // 鳴き待機状態を解除
+        final Map<String, CallInfo> callBufBackup = deepCopyMap(_callBuf);
+        _status = GameStatus.IDLE_DISCARD;
+        _callBuf.clear();
         
-        try {
-            // TODO 最も優先度の高かった処理を実行
-            // 現状全員がパスした場合の挙動に固定
-            final JanController controller = createJanController();
+        // 全員の入力が終わったので、最も優先度の高い処理を判定
+        final CallInfo targetCallInfo = getHighPriorityCall();
+        
+        final JanController controller = createJanController();
+        if (targetCallInfo == null) {
+            // 全員が鳴き放棄
             controller.next(_janInfo);
-            
-            // 鳴き待機状態を解除
-            _status = GameStatus.IDLE_DISCARD;
-            _callBuf.clear();
+            return;
         }
-        catch (final Throwable e) {
-            // TODO コントローラ内の処理でエラーになったらどう復旧する？
-            throw e;
+        
+        switch (targetCallInfo.getCallType()) {
+        case RON:
+            controller.completeRon(_janInfo, targetCallInfo);
+            break;
+        case PON:
+            controller.pon(_janInfo, targetCallInfo);
+            break;
+        case KAN_LIGHT:
+            controller.kanCall(_janInfo, targetCallInfo);
+            break;
+        case CHI:
+            try {
+                controller.chi(_janInfo, targetCallInfo);
+            }
+            catch (final JanException e) {
+                // 入力情報に不備があった場合、鳴き待機状態を継続
+                // チー処理に進んだ場合は鳴き宣言をしたプレイヤーが1名なので、この方式でOK
+                _status = GameStatus.IDLE_CALL;
+                _callBuf.putAll(callBufBackup);
+                _callBuf.remove(targetCallInfo.getPlayerName());
+                throw e;
+            }
+            break;
+        default:
+            throw new InternalError();
         }
     }
     

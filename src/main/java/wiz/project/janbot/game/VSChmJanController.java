@@ -18,6 +18,8 @@ import java.util.TreeMap;
 
 import wiz.project.jan.Hand;
 import wiz.project.jan.JanPai;
+import wiz.project.jan.MenTsu;
+import wiz.project.jan.MenTsuType;
 import wiz.project.jan.Wind;
 import wiz.project.jan.util.HandCheckUtil;
 import wiz.project.jan.util.JanPaiUtil;
@@ -41,6 +43,86 @@ class VSChmJanController implements JanController {
     
     
     /**
+     * 吃
+     */
+    public void chi(final JanInfo info, final CallInfo call) throws JanException {
+        if (info == null) {
+            throw new NullPointerException("Jan info is null.");
+        }
+        if (call == null) {
+            throw new NullPointerException("Call info is null.");
+        }
+        
+        final JanPai target = call.getTargetPai();
+        switch (target) {
+        case MAN_8:
+        case MAN_9:
+        case PIN_8:
+        case PIN_9:
+        case SOU_8:
+        case SOU_9:
+        case TON:
+        case NAN:
+        case SHA:
+        case PEI:
+        case HAKU:
+        case HATU:
+        case CHUN:
+            // チー不可
+            throw new InvalidInputException("Can't chi.");
+        default:
+            break;
+        }
+        
+        // 打牌したプレイヤーの風を記録
+        final Wind activeWind = info.getActiveWind();
+        try {
+            // チー宣言したプレイヤーをアクティブ化
+            info.setActivePlayer(call.getPlayerName());
+            
+            final List<JanPai> targetList = Arrays.asList(target, target.getNext(), target.getNext().getNext());
+            final JanPai discard = info.getActiveDiscard();
+            if (!targetList.contains(discard)) {
+                // チー不可
+                throw new InvalidInputException("Invalid chi parameter.");
+            }
+            
+            // 直前の捨て牌を手牌に加える
+            final Hand hand = info.getActiveHand();
+            hand.addJanPai(discard);
+            
+            for (final JanPai targetPai : targetList) {
+                if (hand.getMenZenJanPaiCount(targetPai) == 0) {
+                    // チー不可
+                    throw new InvalidInputException("Invalid chi parameter.");
+                }
+            }
+            
+            // チー対象牌を削除
+            for (final JanPai targetPai : targetList) {
+                hand.removeJanPai(targetPai);
+            }
+            
+            // 固定面子を追加
+            final MenTsu fix = new MenTsu(targetList, MenTsuType.CHI);
+            hand.addFixedMenTsu(fix);
+            
+            // 手牌を更新
+            info.setHand(info.getActiveWind(), hand);
+            
+            // 捨て牌選択
+            final Player activePlayer = info.getActivePlayer();
+            info.notifyObservers(new GameStatusParam(activePlayer, GameStatus.AFTER_CALL));
+            info.notifyObservers(new AnnounceParam(activePlayer, ANNOUNCE_FLAG_HAND_AFTER_CALL));
+        }
+        catch (final Throwable e) {
+            // 副露しない場合、アクティブプレイヤーを元に戻す
+            info.setActiveWind(activeWind);
+            throw e;
+        }
+    }
+    
+    /**
      * 和了 (ツモ)
      */
     public void completeTsumo(final JanInfo info) throws JanException {
@@ -54,13 +136,39 @@ class VSChmJanController implements JanController {
             throw new BoneheadException("Not completed.");
         }
         
-        info.notifyObservers(new AnnounceParam(info.getActivePlayer(), ANNOUNCE_FLAG_COMPLETE_TSUMO));
+        final Player activePlayer = info.getActivePlayer();
+        info.notifyObservers(new GameStatusParam(activePlayer, GameStatus.END_ROUND));
+        info.notifyObservers(new AnnounceParam(activePlayer, ANNOUNCE_FLAG_COMPLETE_TSUMO));
+    }
+    
+    /**
+     * 和了 (ロン)
+     */
+    public void completeRon(final JanInfo info, final CallInfo call) {
+        if (info == null) {
+            throw new NullPointerException("Jan info is null.");
+        }
+        if (call == null) {
+            throw new NullPointerException("Call info is null.");
+        }
+        
+        // ロン宣言したプレイヤーをアクティブ化
+        info.setActivePlayer(call.getPlayerName());
+        
+        // 打点不足などによるチョンボを確認しない
+        // 上位層(GameMaster)でJanInfoの中身を使って確認を終えている前提とする
+        
+        info.clearCallableTable();
+        
+        final Player activePlayer = info.getActivePlayer();
+        info.notifyObservers(new GameStatusParam(activePlayer, GameStatus.END_ROUND));
+        info.notifyObservers(new AnnounceParam(activePlayer, ANNOUNCE_FLAG_COMPLETE_RON));
     }
     
     /**
      * 打牌 (ツモ切り)
      */
-    public void discard(final JanInfo info) throws JanException {
+    public void discard(final JanInfo info) {
         if (info == null) {
             throw new NullPointerException("Jan info is null.");
         }
@@ -75,6 +183,13 @@ class VSChmJanController implements JanController {
      * 打牌 (手出し)
      */
     public void discard(final JanInfo info, final JanPai target) throws JanException {
+        discard(info, target, false);
+    }
+    
+    /**
+     * 打牌 (手出し)
+     */
+    public void discard(final JanInfo info, final JanPai target, final boolean afterCall) throws JanException {
         if (info == null) {
             throw new NullPointerException("Jan info is null.");
         }
@@ -96,10 +211,11 @@ class VSChmJanController implements JanController {
         
         hand.removeJanPai(target);
         
-        // TODO 鳴き直後の打牌の場合、ここで手牌に加えてはならない
-        hand.addJanPai(activeTsumo);
+        if (!afterCall) {
+            hand.addJanPai(activeTsumo);
+        }
         
-        // JanInfoの内部情報を更新
+        // 手牌情報と待ち牌テーブルを更新
         final Wind activeWind = info.getActiveWind();
         info.setHand(activeWind, hand);
         updateWaitList(info, activeWind);
@@ -112,9 +228,111 @@ class VSChmJanController implements JanController {
     }
     
     /**
+     * 大明槓
+     */
+    public void kanCall(final JanInfo info, final CallInfo call) {
+        if (info == null) {
+            throw new NullPointerException("Jan info is null.");
+        }
+        if (call == null) {
+            throw new NullPointerException("Call info is null.");
+        }
+        
+        // カン宣言したプレイヤーをアクティブ化
+        info.setActivePlayer(call.getPlayerName());
+        
+        final JanPai target = call.getTargetPai();
+        final Hand hand = info.getActiveHand();
+        
+        // カン対象牌を削除
+        for (int i = 0; i < 3; i++) {
+            hand.removeJanPai(target);
+        }
+        
+        // 固定面子を追加
+        final MenTsu kanLight = new MenTsu(Arrays.asList(target, target, target, target), MenTsuType.KAN_LIGHT);
+        hand.addFixedMenTsu(kanLight);
+        
+        // 手牌を更新
+        final Wind activeWind = info.getActiveWind();
+        info.setHand(activeWind, hand);
+        
+        // 王牌操作
+        postProcessKan(info, activeWind);
+        
+        // 捨て牌選択
+        info.notifyObservers(new AnnounceParam(info.getActivePlayer(), ANNOUNCE_FLAG_HAND_TSUMO_FIELD_AFTER_CALL));
+    }
+    
+    /**
+     * 暗槓/加槓
+     */
+    public void kanHand(final JanInfo info, final JanPai target) throws JanException {
+        if (info == null) {
+            throw new NullPointerException("Jan info is null.");
+        }
+        if (target == null) {
+            throw new NullPointerException("Kan target is null.");
+        }
+        
+        // 直前のツモ牌を手牌に加える
+        final Hand hand = info.getActiveHand();
+        final JanPai activeTsumo = info.getActiveTsumo();
+        hand.addJanPai(activeTsumo);
+        
+        final CallType kanType = getKanType(info, target);
+        switch (kanType) {
+        case KAN_DARK:
+            {
+                // カン対象牌を削除
+                for (int i = 0; i < 4; i++) {
+                    hand.removeJanPai(target);
+                }
+                
+                // 固定面子を追加
+                final MenTsu kanDark = new MenTsu(Arrays.asList(target, target, target, target), MenTsuType.KAN_DARK);
+                hand.addFixedMenTsu(kanDark);
+            }
+            break;
+        case KAN_ADD:
+            {
+                // カン対象牌を削除
+                hand.removeJanPai(target);
+                
+                // 固定面子リストを更新
+                final List<MenTsu> fixedMenTsuList = hand.getFixedMenTsuList();
+                for (int i = 0; i < fixedMenTsuList.size(); i++) {
+                    final MenTsu menTsu = fixedMenTsuList.get(i);
+                    if (menTsu.getMenTsuType() == MenTsuType.PON) {
+                        if (menTsu.getSource().get(0) == target) {
+                            final MenTsu kanLight = new MenTsu(Arrays.asList(target, target, target, target), MenTsuType.KAN_LIGHT);
+                            fixedMenTsuList.set(i, kanLight);
+                            hand.setFixedMenTsuList(fixedMenTsuList);
+                            break;
+                        }
+                    }
+                }
+            }
+            break;
+        default:
+            break;
+        }
+        
+        // 手牌を更新
+        final Wind activeWind = info.getActiveWind();
+        info.setHand(activeWind, hand);
+        
+        // 王牌操作
+        postProcessKan(info, activeWind);
+        
+        // 捨て牌選択
+        info.notifyObservers(new AnnounceParam(info.getActivePlayer(), ANNOUNCE_FLAG_HAND_TSUMO_FIELD_AFTER_CALL));
+    }
+    
+    /**
      * 次のプレイヤーの打牌へ
      */
-    public void next(final JanInfo info) throws JanException {
+    public void next(final JanInfo info) {
         if (info == null) {
             throw new NullPointerException("Jan info is null.");
         }
@@ -125,8 +343,45 @@ class VSChmJanController implements JanController {
             return;
         }
         
+        info.clearCallableTable();
         info.setActiveWindToNext();
         onPhase(info);
+    }
+    
+    /**
+     * 碰
+     */
+    public void pon(final JanInfo info, final CallInfo call) {
+        if (info == null) {
+            throw new NullPointerException("Jan info is null.");
+        }
+        if (call == null) {
+            throw new NullPointerException("Call info is null.");
+        }
+        
+        // ポン宣言したプレイヤーをアクティブ化
+        info.setActivePlayer(call.getPlayerName());
+        
+        final JanPai discard = info.getActiveDiscard();
+        final Hand hand = info.getActiveHand();
+        
+        // ポン対象牌を削除
+        for (int i = 0; i < 2; i++) {
+            hand.removeJanPai(discard);
+        }
+        
+        // 固定面子を追加
+        final MenTsu pon = new MenTsu(Arrays.asList(discard, discard, discard), MenTsuType.PON);
+        hand.addFixedMenTsu(pon);
+        
+        // 手牌を更新
+        final Wind activeWind = info.getActiveWind();
+        info.setHand(activeWind, hand);
+        
+        // 捨て牌選択
+        final Player activePlayer = info.getActivePlayer();
+        info.notifyObservers(new GameStatusParam(activePlayer, GameStatus.AFTER_CALL));
+        info.notifyObservers(new AnnounceParam(activePlayer, ANNOUNCE_FLAG_HAND_AFTER_CALL));
     }
     
     /**
@@ -244,6 +499,11 @@ class VSChmJanController implements JanController {
         final Player activePlayer = info.getActivePlayer();
         info.notifyObservers(new AnnounceParam(activePlayer, ANNOUNCE_FLAG_DISCARD));
         
+        if (info.getRemainCount() == 0) {
+            // ラス牌は鳴けない
+            return;
+        }
+        
         // 鳴き確認処理
         final List<Player> callerList = new ArrayList<>();
         for (final Wind wind : Wind.values()) {
@@ -350,6 +610,30 @@ class VSChmJanController implements JanController {
     }
     
     /**
+     * 槓の種類を取得
+     * 
+     * @param info ゲーム情報。
+     * @param target 槓対象牌。
+     * @return 槓の種類。
+     * @throws InvalidInputException 槓不可能。
+     */
+    private CallType getKanType(final JanInfo info, final JanPai target) throws InvalidInputException {
+        final Hand hand = info.getActiveHand();
+        final Wind activeWind = info.getActiveWind();
+        final JanPai activeTsumo = info.getActiveTsumo();
+        final Map<JanPai, Integer> count = getHandMap(info, activeWind, activeTsumo);
+        if (count.containsKey(target) && count.get(target) >= 4) {
+            // 指定牌を4枚持っている
+            return CallType.KAN_DARK;
+        }
+        if (hasPonMenTsu(hand, target)) {
+            // 指定牌のポン面子を持っている
+            return CallType.KAN_ADD;
+        }
+        throw new InvalidInputException("Can't kan.");
+    }
+    
+    /**
      * ポンの待ち牌リストを取得
      * 
      * @param hand クリーン済みの手牌マップ。
@@ -366,6 +650,24 @@ class VSChmJanController implements JanController {
             }
         }
         return resultList;
+    }
+    
+    /**
+     * 指定牌のポン面子を持っているか
+     * 
+     * @param sourceHand 確認元手牌。
+     * @param target 確認対象牌。
+     * @return 確認結果。
+     */
+    private boolean hasPonMenTsu(final Hand sourceHand, final JanPai target) {
+        for (final MenTsu menTsu : sourceHand.getFixedMenTsuList()) {
+            if (menTsu.getMenTsuType() == MenTsuType.PON) {
+                if (menTsu.getSource().get(0) == target) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
     
     /**
@@ -413,9 +715,8 @@ class VSChmJanController implements JanController {
      * 巡目ごとの処理
      * 
      * @param info ゲーム情報。
-     * @throws JanException ゲーム処理例外。
      */
-    private void onPhase(final JanInfo info) throws JanException {
+    private void onPhase(final JanInfo info) {
         // 牌をツモる
         final JanPai activeTsumo = getJanPaiFromDeck(info);
         info.setActiveTsumo(activeTsumo);
@@ -432,6 +733,27 @@ class VSChmJanController implements JanController {
             info.notifyObservers(new AnnounceParam(activePlayer, ANNOUNCE_FLAG_HAND_TSUMO));
             break;
         }
+    }
+    
+    /**
+     * カンの後処理 (王牌操作)
+     * 
+     * @param info ゲーム情報。
+     * @param activeWind アクティブプレイヤーの風。
+     */
+    private void postProcessKan(final JanInfo info, final Wind activeWind) {
+        // ドラを追加
+        final WanPai wanPai = info.getWanPai();
+        wanPai.openNewDora();
+        
+        // 嶺上牌をツモる
+        final JanPai activeTsumo = wanPai.getWall();
+        info.setActiveTsumo(activeTsumo);
+        info.decreaseRemainCount();
+        info.setWanPai(wanPai);
+        
+        // 手変わりがあったので待ち判定更新
+        updateWaitList(info, activeWind);
     }
     
     /**
@@ -470,10 +792,16 @@ class VSChmJanController implements JanController {
         EnumSet.of(AnnounceFlag.FIELD_OPEN);
     private static final EnumSet<AnnounceFlag> ANNOUNCE_FLAG_GAME_OVER =
         EnumSet.of(AnnounceFlag.GAME_OVER, AnnounceFlag.FIELD_OPEN);
+    private static final EnumSet<AnnounceFlag> ANNOUNCE_FLAG_COMPLETE_RON =
+        EnumSet.of(AnnounceFlag.COMPLETE_RON, AnnounceFlag.FIELD_OPEN, AnnounceFlag.RIVER_SINGLE, AnnounceFlag.HAND_OPEN, AnnounceFlag.ACTIVE_TSUMO);
     private static final EnumSet<AnnounceFlag> ANNOUNCE_FLAG_COMPLETE_TSUMO =
         EnumSet.of(AnnounceFlag.COMPLETE_TSUMO, AnnounceFlag.FIELD_OPEN, AnnounceFlag.RIVER_SINGLE, AnnounceFlag.HAND_OPEN, AnnounceFlag.ACTIVE_TSUMO);
     private static final EnumSet<AnnounceFlag> ANNOUNCE_FLAG_HAND_TSUMO =
         EnumSet.of(AnnounceFlag.PLAYER_TURN, AnnounceFlag.HAND_TALK, AnnounceFlag.ACTIVE_TSUMO);
+    private static final EnumSet<AnnounceFlag> ANNOUNCE_FLAG_HAND_AFTER_CALL =
+        EnumSet.of(AnnounceFlag.HAND_TALK, AnnounceFlag.AFTER_CALL);
+    private static final EnumSet<AnnounceFlag> ANNOUNCE_FLAG_HAND_TSUMO_FIELD_AFTER_CALL =
+        EnumSet.of(AnnounceFlag.HAND_TALK, AnnounceFlag.ACTIVE_TSUMO, AnnounceFlag.FIELD_TALK, AnnounceFlag.AFTER_CALL);
     private static final EnumSet<AnnounceFlag> ANNOUNCE_FLAG_DISCARD =
         EnumSet.of(AnnounceFlag.DISCARD, AnnounceFlag.RIVER_SINGLE);
     private static final EnumSet<AnnounceFlag> ANNOUNCE_FLAG_CONFIRM_CALL =
