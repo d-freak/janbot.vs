@@ -193,6 +193,15 @@ final class MessageListener<T extends PircBotX> extends ListenerAdapter<T> {
                 GameMaster.getInstance().onCall(playerName, CallType.RON);
             }
             break;
+        case "hu":
+            if (commandList.size() == 1) {
+                if (!GameMaster.getInstance().getStatus().isIdleCall()) {
+                    GameMaster.getInstance().onCompleteTsumo(playerName);
+                }
+                else {
+                    GameMaster.getInstance().onCall(playerName, CallType.RON);
+                }
+            }
         case "chi":
             if (commandList.size() == 2) {
                 GameMaster.getInstance().onCall(playerName, CallType.CHI, commandList.get(1));
