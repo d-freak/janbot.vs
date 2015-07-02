@@ -9,6 +9,7 @@ package wiz.project.janbot.game;
 
 import static org.junit.Assert.*;
 
+import java.lang.reflect.Field;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -65,6 +66,23 @@ public final class GameMasterTest {
     public void testGetStatus_Normal() {
         final GameStatus result = GameMaster.getInstance().getStatus();
         Assert.assertEquals(GameStatus.CLOSE, result);
+    }
+    
+    /**
+     * onCall() のテスト
+     * 
+     * @type 正常系。
+     */
+    @Test
+    public void testOnCall_Normal_Pon() throws JanException {
+        final GameStatus status = GameStatus.IDLE_CALL;
+        final String playerName = TEST_PLAYER_NAME;
+        final CallType type = CallType.PON;
+        
+        setStatus(status);
+        entry(playerName);
+        
+        GameMaster.getInstance().onCall(playerName, type);
     }
     
     /**
@@ -152,6 +170,41 @@ public final class GameMasterTest {
     @Test
     public void testOnStart() {
         fail("まだ実装されていません");
+    }
+    
+    
+    
+    /**
+     * プレイヤーエントリ
+     * 
+     * @param playerName プレイヤー名。
+     */
+    public void entry(final String playerName) {
+        try {
+            final Field field = GameMaster.getInstance().getClass().getDeclaredField("_playerNameList");
+            field.setAccessible(true);
+            final List<String> playerNameList = (List<String>)field.get(GameMaster.getInstance());
+            playerNameList.add(playerName);
+        }
+        catch (final SecurityException | IllegalAccessException | NoSuchFieldException e) {
+            throw new RuntimeException(e);
+        }
+    }
+    
+    /**
+     * フィールドに値を設定
+     * 
+     * @param value 設定値。
+     */
+    public void setStatus(final GameStatus value) {
+        try {
+            final Field field = GameMaster.getInstance().getClass().getDeclaredField("_status");
+            field.setAccessible(true);
+            field.set(GameMaster.getInstance(), value);
+        }
+        catch (final SecurityException | IllegalAccessException | NoSuchFieldException e) {
+            throw new RuntimeException(e);
+        }
     }
     
     

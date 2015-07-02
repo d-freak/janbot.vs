@@ -208,7 +208,6 @@ public final class GameMaster implements Observer {
                 }
                 break;
             case IDLE_CALL:
-                // 明槓
                 synchronized (_JAN_INFO_LOCK) {
                     onCall(new CallInfo(playerName, type, convertStringToJanPai(target)));
                 }
@@ -217,6 +216,28 @@ public final class GameMaster implements Observer {
                 break;
             }
         }
+    }
+    
+    /**
+     * デバッグ情報出力処理
+     */
+    public void onDebugInfo(final String playerName) {
+        if (playerName == null) {
+            throw new NullPointerException("Player name is null.");
+        }
+        if (playerName.isEmpty()) {
+            throw new IllegalArgumentException("Player name is empty.");
+        }
+        
+        synchronized (_STATUS_LOCK) {
+            IRCBOT.getInstance().talk(playerName, "status : " + _status);
+        }
+        synchronized (_JAN_INFO_LOCK) {
+            IRCBOT.getInstance().talk(playerName, "your callable list : " + _janInfo.getCallableList(playerName));
+            IRCBOT.getInstance().talk(playerName, "callable players : " + _janInfo.getCallablePlayerNameList());
+        }
+        
+        IRCBOT.getInstance().talk(playerName, "call buffer : " + _callBuf);
     }
     
     /**
@@ -279,21 +300,34 @@ public final class GameMaster implements Observer {
         }
         
         synchronized (_STATUS_LOCK) {
-            if (!_status.isIdleDiscard() && !_status.isAfterCall()) {
+            final boolean afterCall = _status.isAfterCall();
+            if (!_status.isIdleDiscard() && !afterCall) {
                 // 入力待機状態ではない場合、コマンド実行を無視
                 return;
             }
-        }
-        
-        synchronized (_JAN_INFO_LOCK) {
-            if (!playerName.equals(_janInfo.getActivePlayer().getName())) {
-                // アクティブ状態ではない場合、コマンド実行を無視
-                return;
-            }
             
-            final JanController controller = createJanController();
-            final JanPai pai = convertStringToJanPai(target);
-            controller.discard(_janInfo, pai);
+            synchronized (_JAN_INFO_LOCK) {
+                if (!playerName.equals(_janInfo.getActivePlayer().getName())) {
+                    // アクティブ状態ではない場合、コマンド実行を無視
+                    return;
+                }
+                
+                if (afterCall) {
+                    _status = GameStatus.IDLE_DISCARD;
+                }
+                try {
+                    final JanController controller = createJanController();
+                    final JanPai pai = convertStringToJanPai(target);
+                    controller.discard(_janInfo, pai, afterCall);
+                }
+                catch (final JanException e) {
+                    // 入力情報に不備があった場合、鳴き直後状態を継続
+                    if (afterCall) {
+                        _status = GameStatus.AFTER_CALL;
+                    }
+                    throw e;
+                }
+            }
         }
     }
     
@@ -635,8 +669,10 @@ public final class GameMaster implements Observer {
             return;
         }
         
-        if (_janInfo.getCallableList(playerName).contains(info.getCallType())) {
-            // 鳴き可能リストに入っていない
+        final CallType type = info.getCallType();
+        if (type != null && !_janInfo.getCallableList(playerName).contains(type)) {
+            // パス(null)ではなく、鳴き可能リストにも入っていない
+            IRCBOT.getInstance().talk(playerName, "(　´∀｀) ＜ チョンボ");
             return;
         }
         
@@ -644,16 +680,17 @@ public final class GameMaster implements Observer {
         
         if (!_callBuf.keySet().containsAll(_janInfo.getCallablePlayerNameList())) {
             // 全員の入力が終わるまでは先の処理に進まない
+            IRCBOT.getInstance().println("(　´∀｀) ＜ 待ってます");
             return;
         }
+        
+        // 全員の入力が終わったので、最も優先度の高い処理を判定
+        final CallInfo targetCallInfo = getHighPriorityCall();
         
         // 鳴き待機状態を解除
         final Map<String, CallInfo> callBufBackup = deepCopyMap(_callBuf);
         _status = GameStatus.IDLE_DISCARD;
         _callBuf.clear();
-        
-        // 全員の入力が終わったので、最も優先度の高い処理を判定
-        final CallInfo targetCallInfo = getHighPriorityCall();
         
         final JanController controller = createJanController();
         if (targetCallInfo == null) {
@@ -667,12 +704,15 @@ public final class GameMaster implements Observer {
             controller.completeRon(_janInfo, targetCallInfo);
             break;
         case PON:
+            IRCBOT.getInstance().println("(　´∀｀) ＜ ポン");
             controller.pon(_janInfo, targetCallInfo);
             break;
         case KAN_LIGHT:
+            IRCBOT.getInstance().println("(　´∀｀) ＜ カン");
             controller.kanCall(_janInfo, targetCallInfo);
             break;
         case CHI:
+            IRCBOT.getInstance().println("(　´∀｀) ＜ チー");
             try {
                 controller.chi(_janInfo, targetCallInfo);
             }

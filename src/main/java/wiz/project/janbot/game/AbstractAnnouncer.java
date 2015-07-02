@@ -154,18 +154,22 @@ abstract class AbstractAnnouncer implements Announcer {
      * 手牌を文字列に変換
      * 
      * @param info ゲーム情報。
+     * @param player 対象プレイヤー。
      * @param param 実況パラメータ。
      * @return 変換結果。
      */
-    protected final String convertHandToString(final JanInfo info, final AnnounceParam param) {
+    protected final String convertHandToString(final JanInfo info, final Player player, final AnnounceParam param) {
         if (info == null) {
             throw new NullPointerException("Source info is null.");
+        }
+        if (player == null) {
+            throw new NullPointerException("Source player is null.");
         }
         if (param == null) {
             throw new NullPointerException("Source parameter is null.");
         }
         
-        final Hand hand = info.getHand(param.getPlayer().getName());
+        final Hand hand = info.getHand(player.getName());
         final StringBuilder buf = new StringBuilder();
         buf.append(convertMenzenHandToString(hand));
         if (param.hasFlag(AnnounceFlag.ACTIVE_TSUMO)) {

@@ -188,6 +188,11 @@ final class MessageListener<T extends PircBotX> extends ListenerAdapter<T> {
                 GameMaster.getInstance().onCompleteTsumo(playerName);
             }
             break;
+        case "ron":
+            if (commandList.size() == 1) {
+                GameMaster.getInstance().onCall(playerName, CallType.RON);
+            }
+            break;
         case "chi":
             if (commandList.size() == 2) {
                 GameMaster.getInstance().onCall(playerName, CallType.CHI, commandList.get(1));
@@ -213,6 +218,11 @@ final class MessageListener<T extends PircBotX> extends ListenerAdapter<T> {
         case "help":
             if (commandList.size() == 1) {
                 GameMaster.getInstance().onHelpTalk(playerName);
+            }
+            break;
+        case "debug":
+            if (commandList.size() == 3) {
+                GameMaster.getInstance().onDebugInfo(playerName);
             }
             break;
         default:

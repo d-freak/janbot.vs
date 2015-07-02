@@ -85,6 +85,11 @@ public enum AnnounceFlag {
     HAND_TALK,
     
     /**
+     * 手牌 (全員に一括トーク)
+     */
+    HAND_TALK_ALL,
+    
+    /**
      * ツモ牌
      */
     ACTIVE_TSUMO,
@@ -108,6 +113,11 @@ public enum AnnounceFlag {
      * 場情報 (トーク)
      */
     FIELD_TALK,
+    
+    /**
+     * 場情報 (全員に一括トーク)
+     */
+    FIELD_TALK_ALL,
     
     /**
      * 捨て牌情報

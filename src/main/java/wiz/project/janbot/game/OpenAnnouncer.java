@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Observable;
 
 import wiz.project.ircbot.IRCBOT;
+import wiz.project.jan.Wind;
 
 
 
@@ -52,18 +53,32 @@ public class OpenAnnouncer extends AbstractAnnouncer {
         final List<String> openMessageList = new ArrayList<>();
         final List<String> talkMessageList = new ArrayList<>();
         if (param.hasFlag(AnnounceFlag.PLAYER_TURN)) {
-            openMessageList.add(player.getName() + " のターン！");
+            // TODO 暫定封鎖
+            // jan i で確認できるようにした上で永久に潰すかもしれない
+//          openMessageList.add(player.getName() + " のターン！");
         }
         if (param.hasFlag(AnnounceFlag.FIELD_OPEN)) {
-            final String field = convertFieldToString(info);
-            openMessageList.add(field);
-            talkMessageList.add(field);
+            openMessageList.add(convertFieldToString(info));
+        }
+        if (param.hasFlag(AnnounceFlag.FIELD_TALK_ALL)) {
+            for (final Wind wind : Wind.values()) {
+                final String name = info.getPlayer(wind).getName();
+                IRCBOT.getInstance().talk(name, convertFieldToString(info, wind));
+            }
         }
         if (param.hasFlag(AnnounceFlag.RIVER_SINGLE)) {
             talkMessageList.add(convertRiverToString(info, param));
         }
         if (param.hasFlag(AnnounceFlag.HAND_OPEN)) {
-            talkMessageList.add(convertHandToString(info, param));
+            talkMessageList.add(convertHandToString(info, param.getPlayer(), param));
+        }
+        if (param.hasFlag(AnnounceFlag.HAND_TALK_ALL)) {
+            for (final Wind wind : Wind.values()) {
+                if (wind != Wind.TON) {
+                    final Player to = info.getPlayer(wind);
+                    IRCBOT.getInstance().talk(to.getName(), convertHandToString(info, to, param));
+                }
+            }
         }
         
         if (param.hasFlag(AnnounceFlag.COMPLETE_RON)) {

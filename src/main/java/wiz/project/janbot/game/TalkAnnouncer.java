@@ -58,8 +58,11 @@ public class TalkAnnouncer extends AbstractAnnouncer {
         if (param.hasFlag(AnnounceFlag.FIELD_TALK)) {
             messageList.add(convertFieldToString(info, playerWind));
         }
+        if (param.hasFlag(AnnounceFlag.AFTER_CALL)) {
+            messageList.add("捨て牌を選んでください");
+        }
         if (param.hasFlag(AnnounceFlag.HAND_TALK)) {
-            messageList.add(convertHandToString(info, param));
+            messageList.add(convertHandToString(info, player, param));
         }
         
         if (param.hasFlag(AnnounceFlag.COMPLETE_RON)) {

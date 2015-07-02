@@ -197,22 +197,25 @@ class VSChmJanController implements JanController {
             throw new NullPointerException("Discard target is null.");
         }
         
-        final JanPai activeTsumo = info.getActiveTsumo();
         final Hand hand = info.getActiveHand();
-        if (hand.getMenZenMap().get(target) <= 0) {
-            if (target == activeTsumo) {
-                // 牌が指定されたがツモ切りだった
-                discard(info);
-                return;
-            }
-            // ツモ牌を含め、手牌に存在しない牌が指定された
-            throw new InvalidInputException("Invalid discard target - " + target);
-        }
-        
-        hand.removeJanPai(target);
-        
         if (!afterCall) {
+            final JanPai activeTsumo = info.getActiveTsumo();
+            if (hand.getMenZenMap().get(target) <= 0) {
+                if (target == activeTsumo) {
+                    // 牌が指定されたがツモ切りだった
+                    discard(info);
+                    return;
+                }
+                // ツモ牌を含め、手牌に存在しない牌が指定された
+                throw new InvalidInputException("Invalid discard target - " + target);
+            }
+            
+            hand.removeJanPai(target);
             hand.addJanPai(activeTsumo);
+        }
+        else {
+            info.clearCallableTable();
+            hand.removeJanPai(target);
         }
         
         // 手牌情報と待ち牌テーブルを更新
@@ -514,6 +517,10 @@ class VSChmJanController implements JanController {
             }
             
             final List<CallType> callableList = createCallableList(info.getWaitTable(wind), target);
+            if (activeWind.getNext() != wind) {
+                // 席順によるチー可否判定
+                callableList.remove(CallType.CHI);
+            }
             if (callableList.isEmpty()) {
                 // 鳴けない場合は無視
                 continue;
@@ -766,9 +773,7 @@ class VSChmJanController implements JanController {
         final Map<JanPai, Integer> hand = getHandMap(info, wind);
         final Map<CallType, List<JanPai>> waitTable = info.getWaitTable(wind);
         waitTable.put(CallType.RON, HandCheckUtil.getCompletableJanPaiList(hand));
-        if (info.getActiveWind().getNext() == wind) {
-            waitTable.put(CallType.CHI, getChiWaitList(hand));
-        }
+        waitTable.put(CallType.CHI, getChiWaitList(hand));
         waitTable.put(CallType.PON, getPonWaitList(hand));
         waitTable.put(CallType.KAN_LIGHT, getKanLightWaitList(hand));
         info.setWaitTable(wind, waitTable);
@@ -789,11 +794,11 @@ class VSChmJanController implements JanController {
      * 実況フラグ
      */
     private static final EnumSet<AnnounceFlag> ANNOUNCE_FLAG_GAME_START =
-        EnumSet.of(AnnounceFlag.FIELD_OPEN);
+        EnumSet.of(AnnounceFlag.FIELD_OPEN, AnnounceFlag.FIELD_TALK_ALL, AnnounceFlag.HAND_TALK_ALL);
     private static final EnumSet<AnnounceFlag> ANNOUNCE_FLAG_GAME_OVER =
         EnumSet.of(AnnounceFlag.GAME_OVER, AnnounceFlag.FIELD_OPEN);
     private static final EnumSet<AnnounceFlag> ANNOUNCE_FLAG_COMPLETE_RON =
-        EnumSet.of(AnnounceFlag.COMPLETE_RON, AnnounceFlag.FIELD_OPEN, AnnounceFlag.RIVER_SINGLE, AnnounceFlag.HAND_OPEN, AnnounceFlag.ACTIVE_TSUMO);
+        EnumSet.of(AnnounceFlag.COMPLETE_RON, AnnounceFlag.FIELD_OPEN, AnnounceFlag.RIVER_SINGLE, AnnounceFlag.HAND_OPEN, AnnounceFlag.ACTIVE_DISCARD);
     private static final EnumSet<AnnounceFlag> ANNOUNCE_FLAG_COMPLETE_TSUMO =
         EnumSet.of(AnnounceFlag.COMPLETE_TSUMO, AnnounceFlag.FIELD_OPEN, AnnounceFlag.RIVER_SINGLE, AnnounceFlag.HAND_OPEN, AnnounceFlag.ACTIVE_TSUMO);
     private static final EnumSet<AnnounceFlag> ANNOUNCE_FLAG_HAND_TSUMO =
